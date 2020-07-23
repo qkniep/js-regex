@@ -1,6 +1,6 @@
 mod validator;
 
-pub use validator::ESRegexValidator;
+pub use validator::EcmaRegexValidator;
 
 #[cfg(test)]
 mod tests {
