@@ -1,2 +1,10 @@
-# regexpp-rs
-Rust port of regexpp (ECMAScript regular expression parser)
+# `regexpp-rs`
+
+[![Build Status](https://img.shields.io/travis/qkniep/regexpp-rs?logo=travis)](https://travis-ci.org/qkniep/regexpp-rs)
+[![codecov](https://codecov.io/gh/qkniep/regexpp-rs/branch/master/graph/badge.svg)](https://codecov.io/gh/qkniep/regexpp-rs)
+![LoC](https://tokei.rs/b1/github/qkniep/regexpp-rs?category=code)
+![License](https://img.shields.io/github/license/qkniep/regexpp-rs)
+
+Rust port of regexpp (ECMAScript regular expression parser).
+This crate is being developed mainly as an efficient validator of ECMAScript regular expressions for
+the [`deno_lint` project](https://github.com/denoland/deno_lint).
