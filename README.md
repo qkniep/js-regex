@@ -8,3 +8,15 @@
 Rust port of regexpp (ECMAScript regular expression parser).
 This crate is being developed mainly as an efficient validator of ECMAScript regular expressions for
 the [`deno_lint` project](https://github.com/denoland/deno_lint).
+
+## Using the Library
+
+TBA
+
+## Performance
+
+TBA
+
+## License
+
+Released under the [MIT License](LICENSE).

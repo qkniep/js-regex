@@ -24,6 +24,9 @@ pub struct EcmaRegexValidator {
     ecma_version: EcmaVersion,
     u_flag: bool,
     n_flag: bool,
+    num_capturing_parens: u32,
+    group_names: HashSet<String>,
+    backreference_names: HashSet<String>,
 }
 
 impl Deref for EcmaRegexValidator {
@@ -47,6 +50,9 @@ impl EcmaRegexValidator {
             ecma_version,
             u_flag: false,
             n_flag: false,
+            num_capturing_parens: 0,
+            group_names: HashSet::new(),
+            backreference_names: HashSet::new(),
         }
     }
 
@@ -102,33 +108,107 @@ impl EcmaRegexValidator {
     /// Pattern[U, N]::
     ///     Disjunction[?U, ?N]
     /// ```
-    fn consume_pattern(&self) {
+    fn consume_pattern(&mut self) {
         let start = self.index();
-        /*self.num_capturing_parens = this.countCapturingParens()
-        self.group_names.clear()
-        self.backreference_names.clear()
+        self.num_capturing_parens = self.count_capturing_parens();
+        self.group_names.clear();
+        self.backreference_names.clear();
 
         //self.onPatternEnter(start)
-        self.consumeDisjunction()
+        self.consume_disjunction();
 
-        if let Some(cp) = self.current_code_point {
+        if let Some(&cp) = self.code_point_with_offset(0) {
             if cp == ')' {
-                this.raise("Unmatched ')'");
+                //this.raise("Unmatched ')'");
             }
-            if (cp == '\\') {
-                this.raise("\\ at end of pattern");
+            if cp == '\\' {
+                //this.raise("\\ at end of pattern");
             }
-            if (cp == ']' || cp == '}') {
-                this.raise("Lone quantifier brackets");
+            if cp == ']' || cp == '}' {
+                //this.raise("Lone quantifier brackets");
             }
-            this.raise("Unexpected character {}", cp);
+            //this.raise("Unexpected character {}", cp);
         }
-        for name in self.backreference_names {
-            if !this._groupNames.has(name) {
-                this.raise("Invalid named capture referenced")
+
+        for name in &self.backreference_names {
+            if !self.group_names.contains(name) {
+                //this.raise("Invalid named capture referenced")
             }
-        }*/
-        //self.onPatternLeave(start, this.index)
+        }
+        //self.onPatternLeave(start, self.index());
+    }
+
+    /// Validate the next characters as a RegExp `Disjunction` production.
+    /// ```grammar
+    /// Disjunction[U, N]::
+    ///      Alternative[?U, ?N]
+    ///      Alternative[?U, ?N] `|` Disjunction[?U, ?N]
+    /// ```
+    fn consume_disjunction(&mut self) {
+        let start = self.index();
+        let mut i = 0;
+
+        //self.onDisjunctionEnter(start);
+        self.consume_alternative(i);
+        while self.eat('|') {
+            i += 1;
+            self.consume_alternative(i);
+        }
+
+        //if self.consume_quantifier(true) {
+            //this.raise("Nothing to repeat")
+        //}
+        if self.eat('{') {
+            //this.raise("Lone quantifier brackets")
+        }
+        //self.on_disjunction_leave(start, self.index());
+    }
+
+    /// Validate the next characters as a RegExp `Alternative` production.
+    /// ```grammar
+    /// Alternative[U, N]::
+    ///      ε
+    ///      Alternative[?U, ?N] Term[?U, ?N]
+    /// ```
+    fn consume_alternative(&mut self, i: u32) {
+        let start = self.index();
+
+        //self.on_alternative_enter(start, i)
+        //while self.code_point_with_offset(0).is_some() && self.consume_term() {
+            // do nothing
+        //}
+        //self.on_alternative_leave(start, self.index(), i);
+    }
+
+    fn count_capturing_parens(&mut self) -> u32 {
+        let start = self.index();
+        let mut in_class = false;
+        let mut escaped = false;
+        let mut count = 0;
+
+        while let Some(&cp) = self.code_point_with_offset(0) {
+            if escaped {
+                escaped = false;
+            } else if cp == '\\' {
+                escaped = true;
+            } else if cp == '[' {
+                in_class = true;
+            } else if cp == ']' {
+                in_class = false;
+            } else if cp == '('
+                && !in_class
+                && (self.code_point_with_offset(1) != Some(&'?')
+                    || (self.code_point_with_offset(2) == Some(&'<')
+                        && self.code_point_with_offset(3) != Some(&'=')
+                        && self.code_point_with_offset(3) != Some(&'!')))
+            {
+                count += 1
+            }
+            self.advance();
+        }
+
+        self.rewind(start);
+        count
     }
 }
 
