@@ -1,3 +1,4 @@
+mod reader;
 mod validator;
 
 pub use validator::EcmaRegexValidator;

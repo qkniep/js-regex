@@ -1,129 +1,82 @@
 // Copyright (C) 2020 Quentin M. Kniep <hello@quentinkniep.com>
 // Distributed under terms of the MIT license.
 
-const legacyImpl = {
-    at(s: string, end: number, i: number): number {
-        return i < end ? s.charCodeAt(i) : -1
-    },
-    width(c: number): number {
-        return 1
-    },
-}
+use std::collections::VecDeque;
 
-const unicodeImpl = {
-    at(s: string, end: number, i: number): number {
-        return i < end ? s.codePointAt(i)! : -1
-    },
-    width(c: number): number {
-        return c > 0xffff ? 2 : 1
-    },
-}
-
-struct Reader {
-    implem = legacyImpl;
-    src: &str,
+#[derive(Debug)]
+pub struct Reader {
+    unicode: bool,
+    src: String,
     index: usize,
     end: usize,
-    cp1: Option<char>,
-    w1: usize,
-    cp2: Option<char>,
-    w2: usize,
-    cp3: Option<char>,
-    w3: usize,
-    cp4: Option<char>,
+    cps: VecDeque<char>,
+    widths: VecDeque<usize>,
 }
 
 impl Reader {
     pub fn new() -> Self {
         Self {
-            implem: legacyImpl,
-            src: "",
+            unicode: false,
+            src: "".to_string(),
             index: 0,
             end: 0,
-            cp1: None,
-            w1: 1,
-            cp2: None,
-            w2: 1,
-            cp3: None,
-            w3: 1,
-            cp4: None,
-            w4: 1,
+            cps: VecDeque::with_capacity(4),
+            widths: VecDeque::with_capacity(3),
         }
     }
 
     pub fn source(&self) -> &str {
-        self.src
+        &self.src
     }
 
     pub fn index(&self) -> usize {
         self.index
     }
 
-    pub fn currentCodePoint(&self) -> char {
-        self.cp1
+    pub fn code_point_with_offset(&self, offset: usize) -> Option<&char> {
+        self.cps.get(offset)
     }
 
-    pub fn nextCodePoint() -> char {
-        self.cp2
-    }
-
-    pub fn nextCodePoint2() -> char {
-        self.cp3
-    }
-
-    pub fn nextCodePoint3() -> char {
-        self.cp4
-    }
-
-    pub fn reset(
-        &mut self,
-        source: &str,
-        start: usize,
-        end: usize,
-        uFlag: bool,
-    ) {
-        self.implem = uFlag ? unicodeImpl : legacyImpl;
-        self.src = source;
+    pub fn reset(&mut self, source: &str, start: usize, end: usize, u_flag: bool) {
+        self.unicode = u_flag;
+        self.src = source.into();
         self.end = end;
         self.rewind(start);
     }
 
     pub fn rewind(&mut self, index: usize) {
-        let implem = self.implem;
         self.index = index;
-        self.cp1 = implem.at(self.src, self.end, index);
-        self.w1 = implem.width(this.cp1);
-        self.cp2 = implem.at(self.src, self.end, index + self.w1);
-        self.w2 = implem.width(this.cp2);
-        self.cp3 = implem.at(self.src, self.end, index + self.w1 + self.w2);
-        self.w3 = implem.width(self.cp3);
-        self.cp4 = implem.at(
-            self.src,
-            self.end,
-            index + self.w1 + self.w2 + self.w3,
-        );
-    }
-
-    pub fn advance(&mut self) {
-        if self.cp1 != -1 {
-            let implem = self.implem;
-            self.index += self.w1;
-            self.cp1 = self.cp2;
-            self.w1 = self.w2;
-            self.cp2 = self.cp3;
-            self.w2 = implem.width(self.cp2);
-            self.cp3 = self.cp4;
-            self.w3 = implem.width(self.cp3);
-            self.cp4 = implem.at(
-                self.src,
-                self.end,
-                self.index + self.w1 + self.w2 + self.w3,
-            );
+        self.cps.clear();
+        self.widths.clear();
+        for i in 0..4 {
+            let w_sum: usize = self.widths.iter().take(i).sum();
+            if let Some(c) = self.at(index + w_sum) {
+                self.cps.push_back(c);
+                self.widths.push_back(self.width(c));
+            } else {
+                break;
+            }
         }
     }
 
+    pub fn advance(&mut self) {
+        if self.cps.get(0).is_some() {
+            self.index += self.widths[0];
+            self.cps.pop_front();
+            self.widths.pop_front();
+            let w_sum: usize = self.widths.iter().sum();
+            if let Some(c) = self.at(self.index + w_sum) {
+                self.widths.push_back(self.width(*self.cps.back().unwrap()));
+                self.cps.push_back(c);
+            }
+        }
+        println!("{:?}", self.cps);
+        println!("{:?}", self.widths);
+    }
+
     pub fn eat(&mut self, cp: char) -> bool {
-        if self.cp1 == cp {
+        let opt = self.cps.get(0);
+        if opt.is_some() && *opt.unwrap() == cp {
             self.advance();
             return true;
         }
@@ -131,7 +84,8 @@ impl Reader {
     }
 
     pub fn eat2(&mut self, cp1: char, cp2: char) -> bool {
-        if self.cp1 == cp1 && self.cp2 == cp2 {
+        let (opt1, opt2) = (self.cps.get(0), self.cps.get(1));
+        if opt1.is_some() && opt2.is_some() && *opt1.unwrap() == cp1 && *opt2.unwrap() == cp2 {
             self.advance();
             self.advance();
             return true;
@@ -140,7 +94,14 @@ impl Reader {
     }
 
     pub fn eat3(&mut self, cp1: char, cp2: char, cp3: char) -> bool {
-        if self.cp1 == cp1 && self.cp2 == cp2 && self.cp3 == cp3 {
+        let (opt1, opt2, opt3) = (self.cps.get(0), self.cps.get(1), self.cps.get(2));
+        if opt1.is_some()
+            && opt2.is_some()
+            && opt3.is_some()
+            && *opt1.unwrap() == cp1
+            && *opt2.unwrap() == cp2
+            && *opt3.unwrap() == cp3
+        {
             self.advance();
             self.advance();
             self.advance();
@@ -148,8 +109,30 @@ impl Reader {
         }
         return false;
     }
-}
 
+    fn at(&self, i: usize) -> Option<char> {
+        println!("{:x?}", self.src.as_bytes());
+        if i >= self.end {
+            None
+        } else if self.unicode {
+            // TODO: read non ASCII as UTF-8
+            let c: char = self.src.as_bytes()[i].into();
+            Some(c)
+        } else {
+            // TODO: read non ASCII as UTF-16
+            let c: char = self.src.as_bytes()[i].into();
+            Some(c)
+        }
+    }
+
+    fn width(&self, c: char) -> usize {
+        if self.unicode && c > '\u{FFFF}' {
+            2
+        } else {
+            1
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -157,7 +140,7 @@ mod tests {
 
     #[test]
     fn eat_test() {
-        let reader = Reader::new();
+        let mut reader = Reader::new();
         reader.reset("abcdefghijk", 0, 11, true);
         assert_eq!(reader.eat('a'), true);
         assert_eq!(reader.eat3('b', 'd', 'd'), false);
@@ -168,4 +151,26 @@ mod tests {
         assert_eq!(reader.eat2('h', 'i'), true);
         assert_eq!(reader.eat3('j', 'k', 'a'), false);
     }
+
+    #[test]
+    fn rewind_test() {
+        let mut reader = Reader::new();
+        reader.reset("abcd", 0, 4, true);
+        assert_eq!(reader.eat('a'), true);
+        assert_eq!(reader.eat3('b', 'd', 'd'), false);
+        assert_eq!(reader.eat3('b', 'c', 'd'), true);
+        reader.rewind(0);
+        assert_eq!(reader.eat('a'), true);
+        assert_eq!(reader.eat3('b', 'd', 'd'), false);
+        assert_eq!(reader.eat3('b', 'c', 'd'), true);
+    }
+
+    /*#[test]
+    fn at_test_es_compliance() {
+        let mut reader = Reader::new();
+        reader.reset("􀃃a🩢☃★♲", 0, 20, false);
+        assert_eq!(reader.at(0).unwrap() as u32, 56256);
+        reader.reset("􀃃a🩢☃★♲", 0, 20, true);
+        assert_eq!(reader.at(0).unwrap() as u32, 1048771);
+    }*/
 }
