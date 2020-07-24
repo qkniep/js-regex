@@ -2,7 +2,7 @@
 // Distributed under terms of the MIT license.
 
 use std::collections::HashSet;
-use std::ops::{Deref, DerefMut};
+use std::ops::{Deref, DerefMut, Range};
 
 use crate::reader::Reader;
 
@@ -21,9 +21,13 @@ enum EcmaVersion {
 #[derive(Debug)]
 pub struct EcmaRegexValidator {
     reader: Reader,
+    strict: bool,
     ecma_version: EcmaVersion,
     u_flag: bool,
     n_flag: bool,
+    last_int_value: usize,
+    last_min_value: usize,
+    last_max_value: usize,
     num_capturing_parens: u32,
     group_names: HashSet<String>,
     backreference_names: HashSet<String>,
@@ -47,9 +51,13 @@ impl EcmaRegexValidator {
     fn new(ecma_version: EcmaVersion) -> Self {
         EcmaRegexValidator {
             reader: Reader::new(),
+            strict: false,
             ecma_version,
             u_flag: false,
             n_flag: false,
+            last_int_value: 0,
+            last_min_value: 0,
+            last_max_value: 0,
             num_capturing_parens: 0,
             group_names: HashSet::new(),
             backreference_names: HashSet::new(),
@@ -98,8 +106,18 @@ impl EcmaRegexValidator {
         // TODO: return Result
         self.u_flag = u_flag && self.ecma_version >= EcmaVersion::ES2015;
         self.n_flag = u_flag && self.ecma_version >= EcmaVersion::ES2018;
-        //TODO: rewind
+        self.reset(source, 0, source.len(), u_flag);
         self.consume_pattern();
+
+        if !self.n_flag &&
+            self.ecma_version >= EcmaVersion::ES2018 &&
+            self.group_names.len() > 0
+         {
+            self.n_flag = true;
+            self.rewind(0);
+            self.consume_pattern();
+        }
+
         return true;
     }
 
@@ -180,6 +198,147 @@ impl EcmaRegexValidator {
         //self.on_alternative_leave(start, self.index(), i);
     }
 
+    /// Validate the next characters as a RegExp `Term` production if possible.
+    /// ```grammar
+    /// Term[U, N]::
+    ///      [strict] Assertion[+U, ?N]
+    ///      [strict] Atom[+U, ?N]
+    ///      [strict] Atom[+U, ?N] Quantifier
+    ///      [annexB][+U] Assertion[+U, ?N]
+    ///      [annexB][+U] Atom[+U, ?N]
+    ///      [annexB][+U] Atom[+U, ?N] Quantifier
+    ///      [annexB][~U] QuantifiableAssertion[?N] Quantifier
+    ///      [annexB][~U] Assertion[~U, ?N]
+    ///      [annexB][~U] ExtendedAtom[?N] Quantifier
+    ///      [annexB][~U] ExtendedAtom[?N]
+    /// ```
+    /// Returns `true` if it consumed the next characters successfully.
+    /*fn consume_term(&self) -> bool {
+        if self.u_flag || self.strict {
+            return
+                self.consume_assertion() ||
+                (self.consume_atom() && self.consume_optional_quantifier())
+        }
+        return
+            (self.consume_assertion() &&
+                (!self.last_assertion_is_quantifiable ||
+                    self.consume_optional_quantifier())) ||
+            (self.consume_extended_atom() && self.consume_optional_quantifier())
+    }
+
+    fn consume_optional_quantifier() -> bool {
+        this.consume_quantifier()
+        true
+    }*/
+
+    /// Validate the next characters as a RegExp `Quantifier` production if possible.
+    /// ```grammar
+    /// Quantifier::
+    ///      QuantifierPrefix
+    ///      QuantifierPrefix `?`
+    /// QuantifierPrefix::
+    ///      `*`
+    ///      `+`
+    ///      `?`
+    ///      `{` DecimalDigits `}`
+    ///      `{` DecimalDigits `,}`
+    ///      `{` DecimalDigits `,` DecimalDigits `}`
+    /// ```
+    /// Returns `true` if it consumed the next characters successfully.
+    fn consume_quantifier(&mut self, no_consume: bool) -> bool {
+        let start = self.index();
+        let mut min = 0;
+        let mut max = 0;
+        let mut greedy = false;
+
+        // QuantifierPrefix
+        if self.eat('*') {
+            min = 0;
+            max = usize::MAX;
+        } else if self.eat('+') {
+            min = 1;
+            max = usize::MAX;
+        } else if self.eat('?') {
+            min = 0;
+            max = 1;
+        } else if self.eat_braced_quantifier(no_consume) {
+            //range = self.last_min_value..self.last_max_value;
+        } else {
+            return false;
+        }
+
+        greedy = !self.eat('?');
+
+        if !no_consume {
+            //self.on_quantifier(start, self.index(), range, greedy);
+        }
+        return true;
+    }
+
+    /// Eats the next characters as the following alternatives if possible.
+    /// Sets `self.last_min_value` and `self.last_max_value` if it consumed the next characters
+    /// successfully.
+    /// ```grammar
+    ///      `{` DecimalDigits `}`
+    ///      `{` DecimalDigits `,}`
+    ///      `{` DecimalDigits `,` DecimalDigits `}`
+    /// ```
+    /// Returns `true` if it consumed the next characters successfully.
+    fn eat_braced_quantifier(&mut self, no_error: bool) -> bool {
+        let start = self.index();
+        if self.eat('{') {
+            self.last_min_value = 0;
+            self.last_max_value = usize::MAX;
+            if self.eat_decimal_digits() {
+                self.last_min_value = self.last_int_value;
+                self.last_max_value = self.last_int_value;
+                if self.eat(',') {
+                    self.last_max_value = if self.eat_decimal_digits() {
+                        self.last_int_value
+                    } else {
+                        usize::MAX
+                    }
+                }
+                if self.eat('}') {
+                    if !no_error && self.last_max_value < self.last_min_value {
+                        //self.raise("numbers out of order in {} quantifier");
+                    }
+                    return true;
+                }
+            }
+            if !no_error && (self.u_flag || self.strict) {
+                //self.raise("Incomplete quantifier");
+            }
+            self.rewind(start);
+        }
+        return false
+    }
+
+    /// Eat the next characters as a `DecimalDigits` production if possible.
+    /// Set `self.last_int_value` if it ate the next characters successfully.
+    /// ```grammar
+    /// DecimalDigits::
+    ///      DecimalDigit
+    ///      DecimalDigits DecimalDigit
+    /// DecimalDigit:: one of
+    ///      0 1 2 3 4 5 6 7 8 9
+    /// ```
+    /// Returns `true` if it ate the next characters successfully.
+    fn eat_decimal_digits(&mut self) -> bool {
+        let start = self.index();
+
+        self.last_int_value = 0;
+        while let Some(&c) = self.code_point_with_offset(0) {
+            if !c.is_digit(10) { break; }
+            self.last_int_value =
+                10 * self.last_int_value +
+                   self.code_point_with_offset(0).unwrap().to_digit(10).unwrap() as usize;
+            self.advance();
+        }
+
+        return self.index() != start;
+    }
+
     fn count_capturing_parens(&mut self) -> u32 {
         let start = self.index();
         let mut in_class = false;
@@ -222,5 +381,15 @@ mod tests {
         assert_eq!(validator.validate_flags("gimuys"), true);
         assert_eq!(validator.validate_flags("gimgu"), false);
         assert_eq!(validator.validate_flags("gimuf"), false);
+    }
+
+    #[test]
+    fn validate_pattern_test() {
+        let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2018);
+        assert_eq!(validator.validate_pattern("[abc]de|fg", false), true);
+    }
+
+    #[test]
+    fn count_capturing_parens_test() {
     }
 }
