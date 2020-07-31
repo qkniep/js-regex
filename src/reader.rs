@@ -33,8 +33,8 @@ impl Reader {
         self.index
     }
 
-    pub fn code_point_with_offset(&self, offset: usize) -> Option<&char> {
-        self.cps.get(offset)
+    pub fn code_point_with_offset(&self, offset: usize) -> Option<char> {
+        self.cps.get(offset).cloned()
     }
 
     pub fn reset(&mut self, source: &str, start: usize, end: usize, u_flag: bool) {
@@ -70,8 +70,6 @@ impl Reader {
                 self.cps.push_back(c);
             }
         }
-        println!("{:?}", self.cps);
-        println!("{:?}", self.widths);
     }
 
     pub fn eat(&mut self, cp: char) -> bool {
