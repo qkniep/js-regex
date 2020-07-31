@@ -14,8 +14,12 @@ mod tests {
     fn validate_flags_test() {
         let validator = EcmaRegexValidator::new(EcmaVersion::ES2018);
         assert_eq!(validator.validate_flags("gimuys"), Ok(()));
+        assert_eq!(validator.validate_flags("g"), Ok(()));
+        assert_eq!(validator.validate_flags("gim"), Ok(()));
+
         assert_eq!(validator.validate_flags("gimgu"), Err("Duplicated flag g".to_string()));
         assert_eq!(validator.validate_flags("gimuf"), Err("Invalid flag f".to_string()));
+        assert_eq!(validator.validate_flags("a"), Err("Invalid flag a".to_string()));
     }
 
     #[test]
@@ -26,5 +30,20 @@ mod tests {
         assert_ne!(validator.validate_pattern("^[z-a]$", false), Ok(()));
         assert_ne!(validator.validate_pattern("0{2,1}", false), Ok(()));
         assert_ne!(validator.validate_pattern("\\", false), Ok(()));
+        assert_ne!(validator.validate_pattern("a**", false), Ok(()));
+        assert_ne!(validator.validate_pattern("++a", false), Ok(()));
+        assert_ne!(validator.validate_pattern("?a", false), Ok(()));
+        assert_ne!(validator.validate_pattern("x{1}{1,}", false), Ok(()));
+        assert_ne!(validator.validate_pattern("x{1,2}{1}", false), Ok(()));
+        assert_ne!(validator.validate_pattern("x{1,}{1}", false), Ok(()));
+        assert_ne!(validator.validate_pattern("x{0,1}{1,}", false), Ok(()));
+        assert_ne!(validator.validate_pattern("a***", false), Ok(()));
+        assert_ne!(validator.validate_pattern("a++", false), Ok(()));
+        assert_ne!(validator.validate_pattern("a+++", false), Ok(()));
+        assert_ne!(validator.validate_pattern("a???", false), Ok(()));
+        assert_ne!(validator.validate_pattern("a????", false), Ok(()));
+        assert_ne!(validator.validate_pattern("*a", false), Ok(()));
+        assert_ne!(validator.validate_pattern("**a", false), Ok(()));
+        assert_ne!(validator.validate_pattern("+a", false), Ok(()));
     }
 }
