@@ -32,16 +32,37 @@ fn is_unicode_property_value_character(cp: char) -> bool {
 }
 
 fn is_regexp_identifier_start(cp: char) -> bool {
-    /*is_id_start(cp) ||*/
+    is_id_start(cp) ||
     cp == '$' || cp == '_'
 }
 
 fn is_regexp_identifier_part(cp: char) -> bool {
-    //is_id_continue(cp) ||
+    is_id_continue(cp) ||
     cp == '$' ||
     cp == '_' ||
     cp == '\u{200c}' ||  // unicode zero-width non-joiner
     cp == '\u{200d}' // unicode zero-width joiner
+}
+
+fn is_id_start(cp: char) -> bool {
+    if (cp as u32) < 0x41 { false }
+    else if (cp as u32) < 0x5b { true }
+    else if (cp as u32) < 0x61 { false }
+    else if (cp as u32) < 0x7b { true }
+    //return isLargeIdStart(cp)
+    else { false }
+}
+
+fn is_id_continue(cp: char) -> bool {
+    if (cp as u32) < 0x30 { false }
+    else if (cp as u32) < 0x3a { true }
+    else if (cp as u32) < 0x41 { false }
+    else if (cp as u32) < 0x5b { true }
+    else if (cp as u32) == 0x5f { true }
+    else if (cp as u32) < 0x61 { false }
+    else if (cp as u32) < 0x7b { true }
+    //else { isLargeIdStart(cp) || isLargeIdContinue(cp) }
+    else { false }
 }
 
 fn is_valid_unicode(cp: usize) -> bool {
@@ -194,10 +215,8 @@ impl EcmaRegexValidator {
             return Err(format!("Unexpected character {}", cp));
         }
 
-        for name in &self.backreference_names {
-            if !self.group_names.contains(name) {
-                return Err(format!("Invalid named capture referenced: {}", name));
-            }
+        for name in self.backreference_names.difference(&self.group_names) {
+            return Err(format!("Invalid named capture referenced: {}", name));
         }
         return Ok(());
     }
@@ -216,8 +235,7 @@ impl EcmaRegexValidator {
 
         if self.consume_quantifier(true)? {
             return Err("Nothing to repeat".to_string());
-        }
-        if self.eat('{') {
+        } else if self.eat('{') {
             return Err("Lone quantifier brackets".to_string());
         }
         return Ok(());
@@ -398,7 +416,7 @@ impl EcmaRegexValidator {
     fn consume_atom(&mut self) -> Result<bool, String> {
         Ok(self.consume_pattern_character()
             || self.consume_dot()
-            || self.consume_reverse_solidus_atom_escape()
+            || self.consume_reverse_solidus_atom_escape()?
             || self.consume_character_class()?
             || self.consume_uncapturing_group()?
             || self.consume_capturing_group()?)
@@ -421,15 +439,15 @@ impl EcmaRegexValidator {
     ///      `\\` AtomEscape[?U, ?N]
     /// ```
     /// Returns `true` if it consumed the next characters successfully.
-    fn consume_reverse_solidus_atom_escape(&mut self) -> bool {
+    fn consume_reverse_solidus_atom_escape(&mut self) -> Result<bool, String> {
         let start = self.index();
-        if self.eat('\'') {
-            //if self.consume_atom_escape() {
-            //return true;
-            //}
+        if self.eat('\\') {
+            if self.consume_atom_escape()? {
+                return Ok(true);
+            }
             self.rewind(start);
         }
-        return false;
+        return Ok(false);
     }
 
     /// Validate the next characters as the following alternatives if possible.
@@ -459,7 +477,7 @@ impl EcmaRegexValidator {
         }
 
         if self.ecma_version >= EcmaVersion::ES2018 {
-            self.consume_group_specifier();
+            self.consume_group_specifier()?;
         } else if self.code_point_with_offset(0) == Some('?') {
             return Err("Invalid group".to_string());
         }
@@ -486,7 +504,7 @@ impl EcmaRegexValidator {
     /// Returns `true` if it consumed the next characters successfully.
     fn consume_extended_atom(&mut self) -> Result<bool, String> {
         Ok(self.eat('.')
-            || self.consume_reverse_solidus_atom_escape()
+            || self.consume_reverse_solidus_atom_escape()?
             || self.consume_reverse_solidus_followed_by_c()
             || self.consume_character_class()?
             || self.consume_uncapturing_group()?
@@ -504,8 +522,7 @@ impl EcmaRegexValidator {
         if self.code_point_with_offset(0) == Some('\\')
             && self.code_point_with_offset(1) == Some('c')
         {
-            // TODO: convert char to unicode code point
-            //self.last_int_value = self.code_point_with_offset(0);
+            self.last_int_value = '\\' as usize;
             self.advance();
             return true;
         }
@@ -581,24 +598,68 @@ impl EcmaRegexValidator {
     ///      `?` GroupName[?U]
     /// ```
     /// Returns `true` if the group name existed.
-    fn consume_group_specifier(&mut self) -> bool {
+    fn consume_group_specifier(&mut self) -> Result<bool, String> {
         if self.eat('?') {
-            if self.eat_group_name() {
+            if self.eat_group_name()? {
                 if !self.group_names.contains(&self.last_str_value) {
                     self.group_names.insert(self.last_str_value.clone());
-                    return true;
+                    return Ok(true);
                 }
-                //self.raise("Duplicate capture group name");
+                return Err("Duplicate capture group name".to_string());
             }
-            //self.raise("Invalid group");
+            return Err("Invalid group".to_string());
         }
-        return false;
+        return Ok(false);
     }
 
-    /// Validate the next characters as a RegExp `DecimalEscape` production if
-    /// possible.
-    /// Set `-1` to `this._lastIntValue` as meaning of a character set if it ate
-    /// the next characters successfully.
+    /// Validate the next characters as a RegExp `AtomEscape` production if possible.
+    /// ```grammar
+    /// AtomEscape[U, N]::
+    ///      [strict] DecimalEscape
+    ///      [annexB][+U] DecimalEscape
+    ///      [annexB][~U] DecimalEscape but only if the CapturingGroupNumber of DecimalEscape is <= NcapturingParens
+    ///      CharacterClassEscape[?U]
+    ///      [strict] CharacterEscape[?U]
+    ///      [annexB] CharacterEscape[?U, ?N]
+    ///      [+N] `k` GroupName[?U]
+    /// ```
+    /// Returns `Ok(true)` if it consumed the next characters successfully.
+    fn consume_atom_escape(&mut self) -> Result<bool, String> {
+        if self.consume_backreference()? ||
+            self.consume_character_class_escape()? ||
+            self.consume_character_escape()? ||
+            (self.n_flag && self.consume_k_group_name()?) {
+            return Ok(true);
+        }
+        if self.strict || self.u_flag {
+            return Err("Invalid escape".to_string());
+        }
+        return Ok(false);
+    }
+
+    /// Validate the next characters as the follwoing alternatives if possible.
+    /// ```grammar
+    ///      [strict] DecimalEscape
+    ///      [annexB][+U] DecimalEscape
+    ///      [annexB][~U] DecimalEscape but only if the CapturingGroupNumber of DecimalEscape is <= NcapturingParens
+    /// ```
+    /// Returns `Ok(true)` if it consumed the next characters successfully.
+    fn consume_backreference(&mut self) -> Result<bool, &str> {
+        let start = self.index();
+        if self.eat_decimal_escape() {
+            if self.last_int_value <= self.num_capturing_parens as usize {
+                return Ok(true);
+            } else if self.strict || self.u_flag {
+                return Err("Invalid escape");
+            }
+            self.rewind(start);
+        }
+        Ok(false)
+    }
+
+    /// Validate the next characters as a RegExp `DecimalEscape` production if possible.
+    /// Set `-1` to `self.last_int_value` as meaning of a character set if it ate the next
+    /// characters successfully.
     /// ```grammar
     /// CharacterClassEscape[U]::
     ///      `d`
@@ -615,7 +676,7 @@ impl EcmaRegexValidator {
         let start = self.index();
 
         if self.eat('d') || self.eat('D') || self.eat('s') || self.eat('S') || self.eat('w') || self.eat('W') {
-            //this._lastIntValue = -1
+            //self.last_int_value = -1;
             return Ok(true);
         }
 
@@ -633,8 +694,7 @@ impl EcmaRegexValidator {
         Ok(false)
     }
 
-    /// Validate the next characters as a RegExp `CharacterEscape` production if
-    /// possible.
+    /// Validate the next characters as a RegExp `CharacterEscape` production if possible.
     /// ```grammar
     /// CharacterEscape[U, N]::
     ///      ControlEscape
@@ -651,15 +711,31 @@ impl EcmaRegexValidator {
         self.eat_c_control_letter() ||
         self.eat_zero() ||
         self.eat_hex_escape_sequence()? ||
-        self.eat_regexp_unicode_escape_sequence(false) ||
+        self.eat_regexp_unicode_escape_sequence(false)? ||
         (!self.strict &&
             !self.u_flag &&
             self.eat_legacy_octal_escape_sequence()) ||
         self.eat_identity_escape())
     }
 
-    /// Validate the next characters as a RegExp `CharacterClass` production if
-    /// possible.
+    /// Validate the next characters as the follwoing alternatives if possible.
+    /// ```grammar
+    ///      `k` GroupName[?U]
+    /// ```
+    /// Returns `Ok(true)` if it consumed the next characters successfully.
+    fn consume_k_group_name(&mut self) -> Result<bool, String> {
+        if self.eat('k') {
+            if self.eat_group_name()? {
+                let group_name = self.last_str_value.clone();
+                self.backreference_names.insert(group_name);
+                return Ok(true);
+            }
+            return Err("Invalid named reference".to_string());
+        }
+        Ok(false)
+    }
+
+    /// Validate the next characters as a RegExp `CharacterClass` production if possible.
     /// ```grammar
     /// CharacterClass[U]::
     ///      `[` [lookahead ≠ ^] ClassRanges[?U] `]`
@@ -667,7 +743,6 @@ impl EcmaRegexValidator {
     /// ```
     /// Returns `true` if it consumed the next characters successfully.
     fn consume_character_class(&mut self) -> Result<bool, String> {
-        let start = self.index();
         if !self.eat('[') {
             return Ok(false);
         }
@@ -726,9 +801,8 @@ impl EcmaRegexValidator {
         Ok(())
     }
 
-    /// Validate the next characters as a RegExp `ClassAtom` production if
-    /// possible.
-    /// Set `this._lastIntValue` if it consumed the next characters successfully.
+    /// Validate the next characters as a RegExp `ClassAtom` production if possible.
+    /// Set `self.last_int_value` if it consumed the next characters successfully.
     /// ```grammar
     /// ClassAtom[U, N]::
     ///      `-`
@@ -738,14 +812,13 @@ impl EcmaRegexValidator {
     ///      `\` ClassEscape[?U, ?N]
     ///      [annexB] `\` [lookahead = c]
     /// ```
-    /// Returns `true` if it consumed the next characters successfully.
+    /// Returns `Ok(true)` if it consumed the next characters successfully.
     fn consume_class_atom(&mut self) -> Result<bool, String> {
         let start = self.index();
 
         if let Some(cp) = self.code_point_with_offset(0) {
             if cp != '\\' && cp != ']' {
                 self.advance();
-                // TODO: convert char to unicode code point
                 self.last_int_value = cp as usize;
                 return Ok(true);
             }
@@ -756,7 +829,6 @@ impl EcmaRegexValidator {
                 return Ok(true);
             }
             if !self.strict && self.code_point_with_offset(0) == Some('c') {
-                // TODO: convert char to unicode code point
                 self.last_int_value = '\\' as usize;
                 return Ok(true);
             }
@@ -768,9 +840,8 @@ impl EcmaRegexValidator {
         Ok(false)
     }
 
-    /// Validate the next characters as a RegExp `ClassEscape` production if
-    /// possible.
-    /// Set `this._lastIntValue` if it consumed the next characters successfully.
+    /// Validate the next characters as a RegExp `ClassEscape` production if possible.
+    /// Set `self.last_int_value` if it consumed the next characters successfully.
     /// ```grammar
     /// ClassEscape[U, N]::
     ///      `b`
@@ -782,18 +853,16 @@ impl EcmaRegexValidator {
     ///      DecimalDigit
     ///      `_`
     /// ```
-    /// Returns `true` if it consumed the next characters successfully.
+    /// Returns `Ok(true)` if it consumed the next characters successfully.
     fn consume_class_escape(&mut self) -> Result<bool, String> {
         if self.eat('b') {
-            // TODO: convert char to unicode code point
-            //self.last_int_value = Backspace;
+            self.last_int_value = 0x7f;  // backspace
             return Ok(true);
         }
 
         // [+U] `-`
         if self.u_flag && self.eat('-') {
-            // TODO: convert char to unicode code point
-            //self.last_int_value = '-';
+            self.last_int_value = '-' as usize;
             return Ok(true);
         }
 
@@ -805,7 +874,6 @@ impl EcmaRegexValidator {
                 if cp.is_digit(10) || cp == '_' {
                     self.advance();
                     self.advance();
-                    // TODO: convert char to unicode code point
                     self.last_int_value = cp as usize % 0x20;
                     return Ok(true);
                 }
@@ -822,14 +890,14 @@ impl EcmaRegexValidator {
     ///      `<` RegExpIdentifierName[?U] `>`
     /// ```
     /// Returns `true` if it ate the next characters successfully.
-    fn eat_group_name(&mut self) -> bool {
+    fn eat_group_name(&mut self) -> Result<bool, String> {
         if self.eat('<') {
-            if self.eat_regexp_identifier_name() && self.eat('>') {
-                return true;
+            if self.eat_regexp_identifier_name()? && self.eat('>') {
+                return Ok(true);
             }
-            //self.raise("Invalid capture group name");
+            return Err("Invalid capture group name".to_string());
         }
-        return false;
+        return Ok(false);
     }
 
     /// Eat the next characters as a RegExp `RegExpIdentifierName` production if
@@ -841,15 +909,15 @@ impl EcmaRegexValidator {
     ///      RegExpIdentifierName[?U] RegExpIdentifierPart[?U]
     /// ```
     /// Returns `true` if it ate the next characters successfully.
-    fn eat_regexp_identifier_name(&mut self) -> bool {
-        if self.eat_regexp_identifier_start() {
+    fn eat_regexp_identifier_name(&mut self) -> Result<bool, String> {
+        if self.eat_regexp_identifier_start()? {
             //self.last_str_value = String.fromCodePoint(self.last_int_value);
-            while self.eat_regexp_identifier_part() {
+            while self.eat_regexp_identifier_part()? {
                 //self.last_str_value += String.fromCodePoint(self.last_int_value);
             }
-            return true;
+            return Ok(true);
         }
-        return false;
+        return Ok(false);
     }
 
     /// Eat the next characters as a RegExp `RegExpIdentifierStart` production if
@@ -864,15 +932,16 @@ impl EcmaRegexValidator {
     ///      [~U] UnicodeLeadSurrogate UnicodeTrailSurrogate
     /// ```
     /// Returns `true` if it ate the next characters successfully.
-    fn eat_regexp_identifier_start(&mut self) -> bool {
+    fn eat_regexp_identifier_start(&mut self) -> Result<bool, String> {
         let start = self.index();
         let force_u_flag = !self.u_flag && self.ecma_version >= EcmaVersion::ES2020;
 
         if let Some(cp) = self.code_point_with_offset(0) {
             self.advance();
             let cp1 = self.code_point_with_offset(0);
-            if cp == '\\' && self.eat_regexp_unicode_escape_sequence(force_u_flag) {
-                //cp = self.last_int_value;  // TODO: convert unicode code point to char
+            if cp == '\\' && self.eat_regexp_unicode_escape_sequence(force_u_flag)? {
+                // TODO: convert unicode code point to char
+                //cp = self.last_int_value;
             } else if force_u_flag
                 && is_lead_surrogate(cp as usize)
                 && cp1.is_some()
@@ -883,16 +952,15 @@ impl EcmaRegexValidator {
             }
 
             if is_regexp_identifier_start(cp) {
-                // TODO: convert char to unicode code point
                 self.last_int_value = cp as usize;
-                return true;
+                return Ok(true);
             }
         }
 
         if self.index() != start {
             self.rewind(start);
         }
-        return false;
+        return Ok(false);
     }
 
     /// Eat the next characters as a RegExp `RegExpIdentifierPart` production if
@@ -909,14 +977,15 @@ impl EcmaRegexValidator {
     ///      <ZWJ>
     /// ```
     /// Returns `true` if it ate the next characters successfully.
-    fn eat_regexp_identifier_part(&mut self) -> bool {
+    fn eat_regexp_identifier_part(&mut self) -> Result<bool, String> {
         let start = self.index();
         let force_u_flag = !self.u_flag && self.ecma_version >= EcmaVersion::ES2020;
         let cp = self.code_point_with_offset(0);
         self.advance();
 
-        if cp == Some('\\') && self.eat_regexp_unicode_escape_sequence(force_u_flag) {
-            //cp = self.last_int_value;  // TODO: convert unicode code point to char
+        if cp == Some('\\') && self.eat_regexp_unicode_escape_sequence(force_u_flag)? {
+            // TODO: convert unicode code point to char
+            //cp = self.last_int_value;
         } else if force_u_flag
         //&&
         // TODO: check UTF-16 unicode surrogates
@@ -929,19 +998,18 @@ impl EcmaRegexValidator {
         }
 
         if is_regexp_identifier_part(cp.unwrap()) {
-            // TODO: convert char to unicode code point
             self.last_int_value = cp.unwrap() as usize;
-            return true;
+            return Ok(true);
         }
 
         if self.index() != start {
             self.rewind(start);
         }
-        return false;
+        return Ok(false);
     }
 
     /// Eat the next characters as the follwoing alternatives if possible.
-    /// Set `this._lastIntValue` if it ate the next characters successfully.
+    /// Set `self.last_int_value` if it ate the next characters successfully.
     /// ```grammar
     ///      `c` ControlLetter
     /// ```
@@ -958,7 +1026,7 @@ impl EcmaRegexValidator {
     }
 
     /// Eat the next characters as the follwoing alternatives if possible.
-    /// Set `this._lastIntValue` if it ate the next characters successfully.
+    /// Set `self.last_int_value` if it ate the next characters successfully.
     /// ```grammar
     ///      `0` [lookahead ∉ DecimalDigit]
     /// ```
@@ -979,7 +1047,7 @@ impl EcmaRegexValidator {
 
     /// Eat the next characters as a RegExp `ControlEscape` production if
     /// possible.
-    /// Set `this._lastIntValue` if it ate the next characters successfully.
+    /// Set `self.last_int_value` if it ate the next characters successfully.
     /// ```grammar
     /// ControlEscape:: one of
     ///      f n r t v
@@ -1042,7 +1110,7 @@ impl EcmaRegexValidator {
     ///      [+U] `u{` CodePoint `}`
     /// ```
     /// Returns `true` if it ate the next characters successfully.
-    fn eat_regexp_unicode_escape_sequence(&mut self, force_u_flag: bool) -> bool {
+    fn eat_regexp_unicode_escape_sequence(&mut self, force_u_flag: bool) -> Result<bool, &str> {
         let start = self.index();
         let u_flag = force_u_flag || self.u_flag;
 
@@ -1051,15 +1119,15 @@ impl EcmaRegexValidator {
                 || self.eat_fixed_hex_digits(4)
                 || (u_flag && self.eat_regexp_unicode_codepoint_escape())
             {
-                return true;
+                return Ok(true);
             }
             if self.strict || u_flag {
-                //self.raise("Invalid unicode escape");
+                return Err("Invalid unicode escape");
             }
             self.rewind(start);
         }
 
-        return false;
+        return Ok(false);
     }
 
     /// Eat the next characters as the following alternatives if possible.

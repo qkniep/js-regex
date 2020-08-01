@@ -109,7 +109,6 @@ impl Reader {
     }
 
     fn at(&self, i: usize) -> Option<char> {
-        println!("{:x?}", self.src.as_bytes());
         if i >= self.end {
             None
         } else if self.unicode {

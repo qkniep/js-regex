@@ -55,6 +55,8 @@ mod tests {
         assert_eq!(validator.validate_pattern("[abc]de|fg", true), Ok(()));
         assert_eq!(validator.validate_pattern("^.$", false), Ok(()));
         assert_eq!(validator.validate_pattern("^.$", true), Ok(()));
+        assert_eq!(validator.validate_pattern("foo\\[bar", false), Ok(()));
+        assert_eq!(validator.validate_pattern("foo\\[bar", true), Ok(()));
 
         assert_ne!(validator.validate_pattern("^[z-a]$", false), Ok(()));
         assert_ne!(validator.validate_pattern("0{2,1}", false), Ok(()));
@@ -106,5 +108,45 @@ mod tests {
         assert_ne!(validator.validate_pattern("{1", true), Ok(()));
         assert_ne!(validator.validate_pattern("{1,", true), Ok(()));
         assert_ne!(validator.validate_pattern("{1,2", true), Ok(()));
+    }
+
+    #[test]
+    fn unicode_single_bracket() {
+        let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2018);
+        assert_ne!(validator.validate_pattern("(", true), Ok(()));
+        assert_ne!(validator.validate_pattern(")", true), Ok(()));
+        assert_ne!(validator.validate_pattern("[", true), Ok(()));
+        assert_ne!(validator.validate_pattern("]", true), Ok(()));
+        assert_ne!(validator.validate_pattern("{", true), Ok(()));
+        assert_ne!(validator.validate_pattern("}", true), Ok(()));
+    }
+
+    #[test]
+    fn unicode_escapes() {
+        let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2018);
+        assert_eq!(validator.validate_pattern("\\u{10ffff}", true), Ok(()));
+        assert_ne!(validator.validate_pattern("\\u{110000}", true), Ok(()));
+        assert_eq!(validator.validate_pattern("\\u{110000}", false), Ok(()));
+        assert_eq!(validator.validate_pattern("foo\\ud803\\ude6dbar", true), Ok(()));
+        assert_eq!(validator.validate_pattern("(\u{12345}|\u{23456}).\\1", true), Ok(()));
+        assert_eq!(validator.validate_pattern("\u{12345}{3}", true), Ok(()));
+
+        // unicode escapes in character classes
+        assert_eq!(validator.validate_pattern("[\\u0062-\\u0066]oo", false), Ok(()));
+        assert_eq!(validator.validate_pattern("[\\u0062-\\u0066]oo", true), Ok(()));
+        assert_eq!(validator.validate_pattern("[\\u{0062}-\\u{0066}]oo", true), Ok(()));
+        assert_eq!(validator.validate_pattern("[\\u{62}-\\u{00000066}]oo", true), Ok(()));
+
+        // invalid escapes
+        assert_eq!(validator.validate_pattern("first\\u\\x\\z\\8\\9second", false), Ok(()));
+        assert_eq!(validator.validate_pattern("[\\u\\x\\z\\8\\9]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("/\\u/u", true), Ok(()));
+        assert_ne!(validator.validate_pattern("/\\u12/u", true), Ok(()));
+        assert_ne!(validator.validate_pattern("/\\ufoo/u", true), Ok(()));
+        assert_ne!(validator.validate_pattern("/\\x/u", true), Ok(()));
+        assert_ne!(validator.validate_pattern("/\\xfoo/u", true), Ok(()));
+        assert_ne!(validator.validate_pattern("/\\z/u", true), Ok(()));
+        assert_ne!(validator.validate_pattern("/\\8/u", true), Ok(()));
+        assert_ne!(validator.validate_pattern("/\\9/u", true), Ok(()));
     }
 }
