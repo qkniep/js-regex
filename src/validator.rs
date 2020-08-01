@@ -32,8 +32,7 @@ fn is_unicode_property_value_character(cp: char) -> bool {
 }
 
 fn is_regexp_identifier_start(cp: char) -> bool {
-    is_id_start(cp) ||
-    cp == '$' || cp == '_'
+    is_id_start(cp) || cp == '$' || cp == '_'
 }
 
 fn is_regexp_identifier_part(cp: char) -> bool {
@@ -45,24 +44,39 @@ fn is_regexp_identifier_part(cp: char) -> bool {
 }
 
 fn is_id_start(cp: char) -> bool {
-    if (cp as u32) < 0x41 { false }
-    else if (cp as u32) < 0x5b { true }
-    else if (cp as u32) < 0x61 { false }
-    else if (cp as u32) < 0x7b { true }
-    //return isLargeIdStart(cp)
-    else { false }
+    if (cp as u32) < 0x41 {
+        false
+    } else if (cp as u32) < 0x5b {
+        true
+    } else if (cp as u32) < 0x61 {
+        false
+    } else if (cp as u32) < 0x7b {
+        true
+    } else {
+        //isLargeIdStart(cp)
+        false
+    }
 }
 
 fn is_id_continue(cp: char) -> bool {
-    if (cp as u32) < 0x30 { false }
-    else if (cp as u32) < 0x3a { true }
-    else if (cp as u32) < 0x41 { false }
-    else if (cp as u32) < 0x5b { true }
-    else if (cp as u32) == 0x5f { true }
-    else if (cp as u32) < 0x61 { false }
-    else if (cp as u32) < 0x7b { true }
-    //else { isLargeIdStart(cp) || isLargeIdContinue(cp) }
-    else { false }
+    if (cp as u32) < 0x30 {
+        false
+    } else if (cp as u32) < 0x3a {
+        true
+    } else if (cp as u32) < 0x41 {
+        false
+    } else if (cp as u32) < 0x5b {
+        true
+    } else if (cp as u32) == 0x5f {
+        true
+    } else if (cp as u32) < 0x61 {
+        false
+    } else if (cp as u32) < 0x7b {
+        true
+    } else {
+        //isLargeIdStart(cp) || isLargeIdContinue(cp)
+        false
+    }
 }
 
 fn is_valid_unicode(cp: usize) -> bool {
@@ -316,11 +330,9 @@ impl EcmaRegexValidator {
         // Lookahead / Lookbehind
         if self.eat2('(', '?') {
             let lookbehind = self.ecma_version >= EcmaVersion::ES2018 && self.eat('<');
-            let mut negate = false;
             let mut flag = self.eat('=');
             if !flag {
-                negate = self.eat('!');
-                flag = negate;
+                flag = self.eat('!');
             }
             if flag {
                 self.consume_disjunction()?;
@@ -625,10 +637,11 @@ impl EcmaRegexValidator {
     /// ```
     /// Returns `Ok(true)` if it consumed the next characters successfully.
     fn consume_atom_escape(&mut self) -> Result<bool, String> {
-        if self.consume_backreference()? ||
-            self.consume_character_class_escape()? ||
-            self.consume_character_escape()? ||
-            (self.n_flag && self.consume_k_group_name()?) {
+        if self.consume_backreference()?
+            || self.consume_character_class_escape()?
+            || self.consume_character_escape()?
+            || (self.n_flag && self.consume_k_group_name()?)
+        {
             return Ok(true);
         }
         if self.strict || self.u_flag {
@@ -675,18 +688,23 @@ impl EcmaRegexValidator {
     fn consume_character_class_escape(&mut self) -> Result<bool, String> {
         let start = self.index();
 
-        if self.eat('d') || self.eat('D') || self.eat('s') || self.eat('S') || self.eat('w') || self.eat('W') {
+        if self.eat('d')
+            || self.eat('D')
+            || self.eat('s')
+            || self.eat('S')
+            || self.eat('w')
+            || self.eat('W')
+        {
             //self.last_int_value = -1;
             return Ok(true);
         }
 
-        if self.u_flag &&
-            self.ecma_version >= EcmaVersion::ES2018 &&
-            (self.eat('p') || self.eat('P')) {
+        if self.u_flag
+            && self.ecma_version >= EcmaVersion::ES2018
+            && (self.eat('p') || self.eat('P'))
+        {
             //self.last_int_value = -1;
-            if self.eat('{') &&
-                self.eat_unicode_property_value_expression()? &&
-                self.eat('}') {
+            if self.eat('{') && self.eat_unicode_property_value_expression()? && self.eat('}') {
                 return Ok(true);
             }
             return Err("Invalid property name".to_string());
@@ -707,15 +725,13 @@ impl EcmaRegexValidator {
     /// ```
     /// Returns `true` if it consumed the next characters successfully.
     fn consume_character_escape(&mut self) -> Result<bool, String> {
-        Ok(self.eat_control_escape() ||
-        self.eat_c_control_letter() ||
-        self.eat_zero() ||
-        self.eat_hex_escape_sequence()? ||
-        self.eat_regexp_unicode_escape_sequence(false)? ||
-        (!self.strict &&
-            !self.u_flag &&
-            self.eat_legacy_octal_escape_sequence()) ||
-        self.eat_identity_escape())
+        Ok(self.eat_control_escape()
+            || self.eat_c_control_letter()
+            || self.eat_zero()
+            || self.eat_hex_escape_sequence()?
+            || self.eat_regexp_unicode_escape_sequence(false)?
+            || (!self.strict && !self.u_flag && self.eat_legacy_octal_escape_sequence())
+            || self.eat_identity_escape())
     }
 
     /// Validate the next characters as the follwoing alternatives if possible.
@@ -856,7 +872,7 @@ impl EcmaRegexValidator {
     /// Returns `Ok(true)` if it consumed the next characters successfully.
     fn consume_class_escape(&mut self) -> Result<bool, String> {
         if self.eat('b') {
-            self.last_int_value = 0x7f;  // backspace
+            self.last_int_value = 0x7f; // backspace
             return Ok(true);
         }
 
@@ -867,9 +883,7 @@ impl EcmaRegexValidator {
         }
 
         // [annexB][~U] `c` ClassControlLetter
-        if !self.strict &&
-            !self.u_flag &&
-            self.code_point_with_offset(0) == Some('c') {
+        if !self.strict && !self.u_flag && self.code_point_with_offset(0) == Some('c') {
             if let Some(cp) = self.code_point_with_offset(1) {
                 if cp.is_digit(10) || cp == '_' {
                     self.advance();
@@ -1263,10 +1277,10 @@ impl EcmaRegexValidator {
             if self.eat_unicode_property_value() {
                 self.last_val_value = self.last_str_value.clone();
                 if is_valid_unicode_property(
-                        self.ecma_version,
-                        &self.last_key_value,
-                        &self.last_val_value,
-                    ) {
+                    self.ecma_version,
+                    &self.last_key_value,
+                    &self.last_val_value,
+                ) {
                     return Ok(true);
                 }
                 return Err("Invalid property name");
@@ -1277,11 +1291,7 @@ impl EcmaRegexValidator {
         // LoneUnicodePropertyNameOrValue
         if self.eat_lone_unicode_property_name_or_value() {
             let name_or_value = self.last_str_value.clone();
-            if is_valid_unicode_property(
-                    self.ecma_version,
-                    "General_Category",
-                    &name_or_value,
-                ) {
+            if is_valid_unicode_property(self.ecma_version, "General_Category", &name_or_value) {
                 self.last_key_value = "General_Category".to_string();
                 self.last_val_value = name_or_value;
                 return Ok(true);
@@ -1470,7 +1480,7 @@ impl EcmaRegexValidator {
             }
         }
         self.last_int_value = 0;
-        return false
+        return false;
     }
 
     /// Eat the next characters as the given number of `HexDigit` productions if
