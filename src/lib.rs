@@ -34,6 +34,8 @@ mod tests {
         let validator = EcmaRegexValidator::new(EcmaVersion::ES2018);
         assert_eq!(validator.validate_flags("gimgu"), Err("Duplicated flag g".to_string()));
         assert_eq!(validator.validate_flags("migg"), Err("Duplicated flag g".to_string()));
+        assert_eq!(validator.validate_flags("igi"), Err("Duplicated flag i".to_string()));
+
         assert_eq!(validator.validate_flags("ii"), Err("Duplicated flag i".to_string()));
         assert_eq!(validator.validate_flags("mm"), Err("Duplicated flag m".to_string()));
         assert_eq!(validator.validate_flags("ss"), Err("Duplicated flag s".to_string()));
@@ -45,12 +47,15 @@ mod tests {
     fn invalid_flags() {
         let validator = EcmaRegexValidator::new(EcmaVersion::ES2018);
         assert_eq!(validator.validate_flags("gimuf"), Err("Invalid flag f".to_string()));
+        assert_eq!(validator.validate_flags("gI"), Err("Invalid flag I".to_string()));
         assert_eq!(validator.validate_flags("a"), Err("Invalid flag a".to_string()));
+        assert_eq!(validator.validate_flags("1"), Err("Invalid flag 1".to_string()));
     }
 
     #[test]
     fn validate_pattern_test() {
         let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2018);
+        assert_eq!(validator.validate_pattern("", false), Ok(()));
         assert_eq!(validator.validate_pattern("[abc]de|fg", false), Ok(()));
         assert_eq!(validator.validate_pattern("[abc]de|fg", true), Ok(()));
         assert_eq!(validator.validate_pattern("^.$", false), Ok(()));
@@ -58,16 +63,10 @@ mod tests {
         assert_eq!(validator.validate_pattern("foo\\[bar", false), Ok(()));
         assert_eq!(validator.validate_pattern("foo\\[bar", true), Ok(()));
 
-        assert_ne!(validator.validate_pattern("^[z-a]$", false), Ok(()));
-        assert_ne!(validator.validate_pattern("0{2,1}", false), Ok(()));
         assert_ne!(validator.validate_pattern("\\", false), Ok(()));
         assert_ne!(validator.validate_pattern("a**", false), Ok(()));
         assert_ne!(validator.validate_pattern("++a", false), Ok(()));
         assert_ne!(validator.validate_pattern("?a", false), Ok(()));
-        assert_ne!(validator.validate_pattern("x{1}{1,}", false), Ok(()));
-        assert_ne!(validator.validate_pattern("x{1,2}{1}", false), Ok(()));
-        assert_ne!(validator.validate_pattern("x{1,}{1}", false), Ok(()));
-        assert_ne!(validator.validate_pattern("x{0,1}{1,}", false), Ok(()));
         assert_ne!(validator.validate_pattern("a***", false), Ok(()));
         assert_ne!(validator.validate_pattern("a++", false), Ok(()));
         assert_ne!(validator.validate_pattern("a+++", false), Ok(()));
@@ -76,6 +75,65 @@ mod tests {
         assert_ne!(validator.validate_pattern("*a", false), Ok(()));
         assert_ne!(validator.validate_pattern("**a", false), Ok(()));
         assert_ne!(validator.validate_pattern("+a", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[{-z]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[a--z]", false), Ok(()));
+
+        assert_ne!(validator.validate_pattern("0{2,1}", false), Ok(()));
+        assert_ne!(validator.validate_pattern("x{1}{1,}", false), Ok(()));
+        assert_ne!(validator.validate_pattern("x{1,2}{1}", false), Ok(()));
+        assert_ne!(validator.validate_pattern("x{1,}{1}", false), Ok(()));
+        assert_ne!(validator.validate_pattern("x{0,1}{1,}", false), Ok(()));
+
+        assert_ne!(validator.validate_pattern("\\1(\\P{P\0[}()/", true), Ok(()));
+    }
+
+    #[test]
+    fn character_range_order() {
+        let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2018);
+        assert_ne!(validator.validate_pattern("^[z-a]$", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[b-ac-e]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[c-eb-a]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[a-dc-b]", false), Ok(()));
+
+        assert_ne!(validator.validate_pattern("[\\10b-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\ad-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\bd-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\Bd-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\db-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\Db-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\sb-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\Sb-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\wb-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\Wb-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\0b-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\td-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\nd-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\vd-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\fd-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\rd-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\c0001d-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\x0061d-G]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[\\u0061d-G]", false), Ok(()));
+
+        assert_ne!(validator.validate_pattern("[b-G\\10]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[d-G\\a]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[d-G\\b]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[d-G\\B]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[b-G\\d]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[b-G\\D]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[b-G\\s]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[b-G\\S]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[b-G\\w]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[b-G\\W]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[b-G\\0]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[d-G\\t]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[d-G\\n]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[d-G\\v]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[d-G\\f]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[d-G\\r]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[d-G\\c0001]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[d-G\\x0061]", false), Ok(()));
+        assert_ne!(validator.validate_pattern("[d-G\\u0061]", false), Ok(()));
     }
 
     #[test]
