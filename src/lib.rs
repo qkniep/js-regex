@@ -62,6 +62,15 @@ mod tests {
         assert_eq!(validator.validate_pattern("^.$", true), Ok(()));
         assert_eq!(validator.validate_pattern("foo\\[bar", false), Ok(()));
         assert_eq!(validator.validate_pattern("foo\\[bar", true), Ok(()));
+        assert_eq!(validator.validate_pattern("\\w+\\s", false), Ok(()));
+        assert_eq!(validator.validate_pattern("(\\w+), (\\w+)", false), Ok(()));
+        assert_eq!(validator.validate_pattern("\\/\\/.*|\\/\\*[^]*\\*\\/", false), Ok(()));
+        assert_eq!(validator.validate_pattern("(\\d{1,2})-(\\d{1,2})-(\\d{4})", false), Ok(()));
+        assert_eq!(validator.validate_pattern("(?:\\d{3}|\\(\\d{3}\\))([-\\/\\.])\\d{3}\\1\\d{4}", false), Ok(()));
+        assert_eq!(validator.validate_pattern("https?:\\/\\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b([-a-zA-Z0-9()@:%_\\+.~#?&//=]*)", false), Ok(()));
+
+        //assert_eq!(validator.validate_pattern("\\p{Script=Greek}", true), Ok(()));
+        //assert_eq!(validator.validate_pattern("\\p{Alphabetic}", true), Ok(()));
 
         assert_ne!(validator.validate_pattern("\\", false), Ok(()));
         assert_ne!(validator.validate_pattern("a**", false), Ok(()));
