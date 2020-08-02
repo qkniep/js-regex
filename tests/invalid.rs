@@ -3,9 +3,9 @@
 // Copyright (C) 2020 Quentin M. Kniep <hello@quentinkniep.com>
 // Distributed under terms of the MIT license.
 
-extern crate regexpp_rs;
+extern crate js_regex;
 
-use regexpp_rs::{EcmaRegexValidator, EcmaVersion};
+use js_regex::{EcmaRegexValidator, EcmaVersion};
 
 #[test]
 fn basic_invalid() {

@@ -1,8 +1,15 @@
 [package]
-name = "regexpp-rs"
+name = "js-regex"
 version = "0.1.0"
 authors = ["Quentin M. Kniep <hello@quentinkniep.com>"]
 edition = "2018"
+description = "Rust validator for ECMAScript regex literals based on regexpp."
+readme = "README.md"
+homepage = "https://quentinkniep.com"
+repository = "https://github.com/qkniep/js-regex"
+license = "MIT"
+keywords = ["js", "ecma", "regex"]
+categories = ["parser-implementations"]
 
 [dependencies]
 lazy_static = "1.4"
