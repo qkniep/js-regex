@@ -17,7 +17,7 @@ impl Reader {
     pub fn new() -> Self {
         Self {
             unicode: false,
-            src: "".to_string(),
+            src: "".to_owned(),
             index: 0,
             end: 0,
             cps: VecDeque::with_capacity(4),
@@ -39,7 +39,7 @@ impl Reader {
 
     pub fn reset(&mut self, source: &str, start: usize, end: usize, u_flag: bool) {
         self.unicode = u_flag;
-        self.src = source.into();
+        self.src = source.to_owned();
         self.end = end;
         self.rewind(start);
     }
@@ -109,22 +109,27 @@ impl Reader {
     }
 
     fn at(&self, i: usize) -> Option<char> {
+        //println!("{:?}", self.src.as_bytes());
+        //println!("{:?}", self.src.encode_utf16().collect::<Vec<u16>>());
         if i >= self.end {
             None
         } else if self.unicode {
             // TODO: read non ASCII as UTF-8
-            let c: char = self.src.as_bytes()[i].into();
+            //let c: char = self.src.as_bytes()[i].into();
+            let c = self.src.chars().skip(i).next().unwrap();
             Some(c)
         } else {
-            // TODO: read non ASCII as UTF-16
-            let c: char = self.src.as_bytes()[i].into();
-            Some(c)
+            // TODO: move the conversion out of this method and make it safe
+            unsafe {
+                let c: char = std::char::from_u32_unchecked(self.src.encode_utf16().skip(i).next().unwrap() as u32);
+                Some(c)
+            }
         }
     }
 
     fn width(&self, c: char) -> usize {
         if self.unicode && c > '\u{FFFF}' {
-            2
+            1
         } else {
             1
         }
@@ -162,12 +167,26 @@ mod tests {
         assert_eq!(reader.eat3('b', 'c', 'd'), true);
     }
 
-    /*#[test]
+    #[test]
     fn at_test_es_compliance() {
         let mut reader = Reader::new();
-        reader.reset("􀃃a🩢☃★♲", 0, 20, false);
+        // without unicode flag
+        reader.reset("Hello", 0, 5, false);
+        assert_eq!(reader.at(1).unwrap() as u32, 101);
+        reader.reset("􀃃a🩢☃★♲", 0, 6, false);
         assert_eq!(reader.at(0).unwrap() as u32, 56256);
-        reader.reset("􀃃a🩢☃★♲", 0, 20, true);
+        reader.reset("􀃃ello", 0, 6, false);
+        assert_eq!(reader.at(0).unwrap() as u32, 56256);
+        reader.reset("􀃃ello", 0, 6, false);
+        assert_eq!(reader.at(1).unwrap() as u32, 56515);
+        // with unicode flag
+        reader.reset("Hello", 0, 5, true);
+        assert_eq!(reader.at(1).unwrap() as u32, 101);
+        reader.reset("􀃃a🩢☃★♲", 0, 6, true);
         assert_eq!(reader.at(0).unwrap() as u32, 1048771);
-    }*/
+        reader.reset("􀃃ello", 0, 6, true);
+        assert_eq!(reader.at(0).unwrap() as u32, 1048771);
+        //reader.reset("􀃃ello", 0, 6, true);
+        //assert_eq!(reader.at(1).unwrap() as u32, 56515);
+    }
 }

@@ -11,7 +11,11 @@ the [`deno_lint` project](https://github.com/denoland/deno_lint).
 
 ## Using the Library
 
-TBA
+```
+let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2018);
+assert_eq!(validator.validate_pattern("foo|abc(d)?", false), Ok(()));
+assert_eq!(validator.validate_flags("gim", false), Ok(()));
+```
 
 ## Performance
 

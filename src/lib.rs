@@ -1,7 +1,11 @@
 // Copyright (C) 2020 Quentin M. Kniep <hello@quentinkniep.com>
 // Distributed under terms of the MIT license.
 
+#[macro_use]
+extern crate lazy_static;
+
 mod reader;
+mod unicode;
 mod validator;
 
 pub use validator::{EcmaRegexValidator, EcmaVersion};
