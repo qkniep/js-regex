@@ -8,7 +8,7 @@ extern crate regexpp_rs;
 use regexpp_rs::{EcmaRegexValidator, EcmaVersion};
 
 #[test]
-fn basic_invalid() {
+fn basic_invalid_2015_unicode() {
     // source: https://github.com/mysticatea/regexpp/blob/master/test/fixtures/parser/literal/basic-invalid-2015-u.json
     let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2015);
     assert_ne!(validator.validate_pattern("(", true), Ok(()));
@@ -61,7 +61,7 @@ fn basic_invalid() {
     assert_ne!(validator.validate_pattern("(?:a)\\1", true), Ok(()));
     assert_ne!(validator.validate_pattern("(a)\\2", true), Ok(()));
     assert_ne!(validator.validate_pattern("(?:a)\\2", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)\\11", true), Ok(()));
+    assert_ne!(validator.validate_pattern("(a)(a)(a)(a)(a)(a)(a)(a)(a)(a)\\11", true), Ok(()));
     assert_ne!(validator.validate_pattern("(?a", true), Ok(()));
     assert_ne!(validator.validate_pattern("(?a)", true), Ok(()));
     assert_ne!(validator.validate_pattern("(?:", true), Ok(()));
@@ -82,8 +82,8 @@ fn basic_invalid() {
     assert_ne!(validator.validate_pattern("\\a", true), Ok(()));
     assert_ne!(validator.validate_pattern("[b-a]", true), Ok(()));
     assert_ne!(validator.validate_pattern("[a-b--+]", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("[\\c1]", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("[\\c]", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\c1]", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\c]", true), Ok(()));
     assert_ne!(validator.validate_pattern("[\\x]", true), Ok(()));
     assert_ne!(validator.validate_pattern("[\\xz]", true), Ok(()));
     assert_ne!(validator.validate_pattern("[\\x1]", true), Ok(()));
@@ -100,17 +100,17 @@ fn basic_invalid() {
     assert_ne!(validator.validate_pattern("[\\400]", true), Ok(()));
     assert_ne!(validator.validate_pattern("[\\a]", true), Ok(()));
     assert_ne!(validator.validate_pattern("[\\d-\\uFFFF]", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("[\\D-\\uFFFF]", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("[\\s-\\uFFFF]", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("[\\S-\\uFFFF]", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("[\\w-\\uFFFF]", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("[\\W-\\uFFFF]", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("[\\u0000-\\d]", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("[\\u0000-\\D]", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("[\\u0000-\\s]", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("[\\u0000-\\S]", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("[\\u0000-\\w]", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("[\\u0000-\\W]", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\D-\\uFFFF]", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\s-\\uFFFF]", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\S-\\uFFFF]", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\w-\\uFFFF]", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\W-\\uFFFF]", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\u0000-\\d]", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\u0000-\\D]", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\u0000-\\s]", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\u0000-\\S]", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\u0000-\\w]", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\u0000-\\W]", true), Ok(()));
     assert_ne!(validator.validate_pattern("[\\u0001-\\u0000]", true), Ok(()));
     assert_ne!(validator.validate_pattern("[\\u{2}-\\u{1}]", true), Ok(()));
     assert_ne!(validator.validate_pattern("[\\u{2-\\u{1}]", true), Ok(()));
@@ -119,7 +119,7 @@ fn basic_invalid() {
     assert_ne!(validator.validate_pattern("[0-9--+]", true), Ok(()));
     assert_ne!(validator.validate_pattern("[\\c-a]", true), Ok(()));
     assert_ne!(validator.validate_pattern("[\\c0-]", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("[\\c_]", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\c_]", true), Ok(()));
     assert_ne!(validator.validate_pattern("[🌸-🌷]", true), Ok(()));
     assert_ne!(validator.validate_pattern("[\\d][\\12-\\14]{1,}[^\\d]", true), Ok(()));
 }
@@ -161,8 +161,8 @@ fn named_capturing_group_invalid_2018() {
     assert_ne!(validator.validate_pattern("\\k<a>", true), Ok(()));
     assert_ne!(validator.validate_pattern("(?<a>a)\\k<", false), Ok(()));
     assert_ne!(validator.validate_pattern("(?<a>a)\\k<", true), Ok(()));
-    //assert_ne!(validator.validate_pattern("(?<a>a)\\k<a", false), Ok(()));
-    //assert_ne!(validator.validate_pattern("(?<a>a)\\k<a", true), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<a>a)\\k<a", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<a>a)\\k<a", true), Ok(()));
     assert_ne!(validator.validate_pattern("(?<a>a)\\2", true), Ok(()));
     assert_ne!(validator.validate_pattern("(?<a>a)\\k<b>", false), Ok(()));
     assert_ne!(validator.validate_pattern("(?<a>a)\\k<b>", true), Ok(()));

@@ -78,19 +78,19 @@ fn is_id_continue(cp: char) -> bool {
     }
 }
 
-fn is_valid_unicode(cp: usize) -> bool {
+fn is_valid_unicode(cp: i64) -> bool {
     cp <= 0x10ffff
 }
 
-fn is_lead_surrogate(cp: usize) -> bool {
+fn is_lead_surrogate(cp: i64) -> bool {
     cp >= 0xd800 && cp <= 0xdbff
 }
 
-fn is_trail_surrogate(cp: usize) -> bool {
+fn is_trail_surrogate(cp: i64) -> bool {
     cp >= 0xdc00 && cp <= 0xdfff
 }
 
-fn combine_surrogate_pair(lead: usize, trail: usize) -> usize {
+fn combine_surrogate_pair(lead: i64, trail: i64) -> i64 {
     (lead - 0xd800) * 0x400 + (trail - 0xdc00) + 0x10000
 }
 
@@ -113,9 +113,9 @@ pub struct EcmaRegexValidator {
     ecma_version: EcmaVersion,
     u_flag: bool,
     n_flag: bool,
-    last_int_value: usize,
-    last_min_value: usize,
-    last_max_value: usize,
+    last_int_value: i64,
+    last_min_value: i64,
+    last_max_value: i64,
     last_str_value: String,
     last_key_value: String,
     last_val_value: String,
@@ -187,6 +187,7 @@ impl EcmaRegexValidator {
 
     /// Validates the pattern of a EcmaScript regular expression.
     pub fn validate_pattern(&mut self, source: &str, u_flag: bool) -> Result<(), String> {
+        self.strict = u_flag; // TODO: allow toggling strict independently of u flag
         self.u_flag = u_flag && self.ecma_version >= EcmaVersion::ES2015;
         self.n_flag = u_flag && self.ecma_version >= EcmaVersion::ES2018;
         //self.reset(source, 0, source.len(), u_flag);
@@ -384,7 +385,7 @@ impl EcmaRegexValidator {
         let start = self.index();
         if self.eat('{') {
             self.last_min_value = 0;
-            self.last_max_value = usize::MAX;
+            self.last_max_value = i64::MAX;
             if self.eat_decimal_digits() {
                 self.last_min_value = self.last_int_value;
                 self.last_max_value = self.last_int_value;
@@ -392,7 +393,7 @@ impl EcmaRegexValidator {
                     self.last_max_value = if self.eat_decimal_digits() {
                         self.last_int_value
                     } else {
-                        usize::MAX
+                        i64::MAX
                     }
                 }
                 if self.eat('}') {
@@ -530,7 +531,7 @@ impl EcmaRegexValidator {
         if self.code_point_with_offset(0) == Some('\\')
             && self.code_point_with_offset(1) == Some('c')
         {
-            self.last_int_value = '\\' as usize;
+            self.last_int_value = '\\' as i64;
             self.advance();
             return true;
         }
@@ -656,7 +657,7 @@ impl EcmaRegexValidator {
     fn consume_backreference(&mut self) -> Result<bool, &str> {
         let start = self.index();
         if self.eat_decimal_escape() {
-            if self.last_int_value <= self.num_capturing_parens as usize {
+            if self.last_int_value <= self.num_capturing_parens as i64 {
                 return Ok(true);
             } else if self.strict || self.u_flag {
                 return Err("Invalid escape");
@@ -689,7 +690,7 @@ impl EcmaRegexValidator {
             || self.eat('w')
             || self.eat('W')
         {
-            //self.last_int_value = -1;
+            self.last_int_value = -1;
             return Ok(true);
         }
 
@@ -697,7 +698,7 @@ impl EcmaRegexValidator {
             && self.ecma_version >= EcmaVersion::ES2018
             && (self.eat('p') || self.eat('P'))
         {
-            //self.last_int_value = -1;
+            self.last_int_value = -1;
             if self.eat('{') && self.eat_unicode_property_value_expression()? && self.eat('}') {
                 return Ok(true);
             }
@@ -778,7 +779,6 @@ impl EcmaRegexValidator {
     ///      ClassAtomNoDash[?U] `-` ClassAtom[?U] ClassRanges[?U]
     /// ```
     fn consume_class_ranges(&mut self) -> Result<(), String> {
-        let strict = self.strict || self.u_flag;
         loop {
             // Consume the first ClassAtom
             if !self.consume_class_atom()? {
@@ -798,12 +798,14 @@ impl EcmaRegexValidator {
             let max = self.last_int_value;
 
             // Validate
-            /*if min == -1 || max == -1 {
-                if strict {
+            if min == -1 || max == -1 {
+                if self.strict {
                     return Err("Invalid character class".to_string());
                 }
-                continue
-            }*/
+                continue;
+            }
+
+            println!("min: {},  max: {}", min, max);
             if min > max {
                 return Err("Range out of order in character class".to_string());
             }
@@ -829,7 +831,7 @@ impl EcmaRegexValidator {
         if let Some(cp) = self.code_point_with_offset(0) {
             if cp != '\\' && cp != ']' {
                 self.advance();
-                self.last_int_value = cp as usize;
+                self.last_int_value = cp as i64;
                 return Ok(true);
             }
         }
@@ -839,7 +841,7 @@ impl EcmaRegexValidator {
                 return Ok(true);
             }
             if !self.strict && self.code_point_with_offset(0) == Some('c') {
-                self.last_int_value = '\\' as usize;
+                self.last_int_value = '\\' as i64;
                 return Ok(true);
             }
             if self.strict || self.u_flag {
@@ -866,13 +868,13 @@ impl EcmaRegexValidator {
     /// Returns `Ok(true)` if it consumed the next characters successfully.
     fn consume_class_escape(&mut self) -> Result<bool, String> {
         if self.eat('b') {
-            self.last_int_value = 0x7f; // backspace
+            self.last_int_value = 0x08; // backspace
             return Ok(true);
         }
 
         // [+U] `-`
         if self.u_flag && self.eat('-') {
-            self.last_int_value = '-' as usize;
+            self.last_int_value = '-' as i64;
             return Ok(true);
         }
 
@@ -882,7 +884,7 @@ impl EcmaRegexValidator {
                 if cp.is_digit(10) || cp == '_' {
                     self.advance();
                     self.advance();
-                    self.last_int_value = cp as usize % 0x20;
+                    self.last_int_value = cp as i64 % 0x20;
                     return Ok(true);
                 }
             }
@@ -919,7 +921,6 @@ impl EcmaRegexValidator {
     /// Returns `true` if it ate the next characters successfully.
     fn eat_regexp_identifier_name(&mut self) -> Result<bool, String> {
         if self.eat_regexp_identifier_start()? {
-            // TODO: maybe use u32 for self.last_int_value?
             self.last_str_value = std::char::from_u32(self.last_int_value as u32)
                 .unwrap()
                 .to_string();
@@ -954,19 +955,19 @@ impl EcmaRegexValidator {
             if cp == '\\' && self.eat_regexp_unicode_escape_sequence(force_u_flag)? {
                 cp = std::char::from_u32(self.last_int_value as u32).unwrap();
             } else if force_u_flag
-                && is_lead_surrogate(cp as usize)
+                && is_lead_surrogate(cp as i64)
                 && cp1.is_some()
-                && is_trail_surrogate(cp1.unwrap() as usize)
+                && is_trail_surrogate(cp1.unwrap() as i64)
             {
                 cp = std::char::from_u32(
-                    combine_surrogate_pair(cp as usize, cp1.unwrap() as usize) as u32,
+                    combine_surrogate_pair(cp as i64, cp1.unwrap() as i64) as u32,
                 )
                 .unwrap();
                 self.advance();
             }
 
             if is_regexp_identifier_start(cp) {
-                self.last_int_value = cp as usize;
+                self.last_int_value = cp as i64;
                 return Ok(true);
             }
         }
@@ -1002,26 +1003,25 @@ impl EcmaRegexValidator {
             // TODO: convert unicode code point to char
             cp = std::char::from_u32(self.last_int_value as u32);
         } else if force_u_flag
-            && is_lead_surrogate(cp.unwrap() as usize)
-            && is_trail_surrogate(cp1.unwrap() as usize)
+            && is_lead_surrogate(cp.unwrap() as i64)
+            && is_trail_surrogate(cp1.unwrap() as i64)
         {
-            // TODO: combine UTF-16 unicode surrogates into one char
             cp = std::char::from_u32(combine_surrogate_pair(
-                cp.unwrap() as usize,
-                cp1.unwrap() as usize,
+                cp.unwrap() as i64,
+                cp1.unwrap() as i64,
             ) as u32);
             self.advance();
         }
 
-        if is_regexp_identifier_part(cp.unwrap()) {
-            self.last_int_value = cp.unwrap() as usize;
+        if cp.is_some() && is_regexp_identifier_part(cp.unwrap()) {
+            self.last_int_value = cp.unwrap() as i64;
             return Ok(true);
         }
 
         if self.index() != start {
             self.rewind(start);
         }
-        return Ok(false);
+        Ok(false)
     }
 
     /// Eat the next characters as the follwoing alternatives if possible.
@@ -1038,7 +1038,7 @@ impl EcmaRegexValidator {
             }
             self.rewind(start);
         }
-        return false;
+        false
     }
 
     /// Eat the next characters as the follwoing alternatives if possible.
@@ -1071,31 +1071,30 @@ impl EcmaRegexValidator {
     /// Returns `true` if it ate the next characters successfully.
     fn eat_control_escape(&mut self) -> bool {
         if self.eat('f') {
-            //this._lastIntValue = FormFeed
+            self.last_int_value = 0x0c; // formfeed
             return true;
         }
         if self.eat('n') {
-            //this._lastIntValue = LineFeed
+            self.last_int_value = 0x0a; // linefeed
             return true;
         }
         if self.eat('r') {
-            //this._lastIntValue = CarriageReturn
+            self.last_int_value = 0x0d; // carriage return
             return true;
         }
         if self.eat('t') {
-            //this._lastIntValue = CharacterTabulation
+            self.last_int_value = 0x09; // character tabulation
             return true;
         }
         if self.eat('v') {
-            //this._lastIntValue = LineTabulation
+            self.last_int_value = 0x0b; // line tabulation
             return true;
         }
-        return false;
+        false
     }
 
-    /// Eat the next characters as a RegExp `ControlLetter` production if
-    /// possible.
-    /// Set `this._lastIntValue` if it ate the next characters successfully.
+    /// Eat the next characters as a RegExp `ControlLetter` production if possible.
+    /// Set `self.last_int_value` if it ate the next characters successfully.
     /// ```grammar
     /// ControlLetter:: one of
     ///      a b c d e f g h i j k l m n o p q r s t u v w x y z
@@ -1106,11 +1105,11 @@ impl EcmaRegexValidator {
         if let Some(cp) = self.code_point_with_offset(0) {
             if cp.is_ascii_alphabetic() {
                 self.advance();
-                self.last_int_value = cp as usize % 0x20;
+                self.last_int_value = cp as i64 % 0x20;
                 return true;
             }
         }
-        return false;
+        false
     }
 
     /// Eat the next characters as a RegExp `RegExpUnicodeEscapeSequence`
@@ -1147,7 +1146,7 @@ impl EcmaRegexValidator {
     }
 
     /// Eat the next characters as the following alternatives if possible.
-    /// Set `this._lastIntValue` if it ate the next characters successfully.
+    /// Set `self.last_int_value` if it ate the next characters successfully.
     /// ```grammar
     ///      LeadSurrogate `\u` TrailSurrogate
     /// ```
@@ -1176,7 +1175,7 @@ impl EcmaRegexValidator {
     }
 
     /// Eat the next characters as the following alternatives if possible.
-    /// Set `this._lastIntValue` if it ate the next characters successfully.
+    /// Set `self.last_int_value` if it ate the next characters successfully.
     /// ```grammar
     ///      `{` CodePoint `}`
     /// ```
@@ -1196,9 +1195,8 @@ impl EcmaRegexValidator {
         return false;
     }
 
-    /// Eat the next characters as a RegExp `IdentityEscape` production if
-    /// possible.
-    /// Set `this._lastIntValue` if it ate the next characters successfully.
+    /// Eat the next characters as a RegExp `IdentityEscape` production if possible.
+    /// Set `self.last_int_value` if it ate the next characters successfully.
     /// ```grammar
     /// IdentityEscape[U, N]::
     ///      [+U] SyntaxCharacter
@@ -1213,8 +1211,7 @@ impl EcmaRegexValidator {
     fn eat_identity_escape(&mut self) -> bool {
         if let Some(cp) = self.code_point_with_offset(0) {
             if self.is_valid_identity_escape(cp) {
-                // TODO: convert char to unicode code point
-                self.last_int_value = cp as usize;
+                self.last_int_value = cp as i64;
                 self.advance();
                 return true;
             }
@@ -1225,17 +1222,15 @@ impl EcmaRegexValidator {
         if self.u_flag {
             return is_syntax_character(cp) || cp == '/';
         } else if self.strict {
-            //return !is_id_continue(cp);
-            return false;
+            return !is_id_continue(cp);
         } else if self.n_flag {
             return !(cp == 'c' || cp == 'k');
         }
         return cp != 'c';
     }
 
-    /// Eat the next characters as a RegExp `DecimalEscape` production if
-    /// possible.
-    /// Set `this._lastIntValue` if it ate the next characters successfully.
+    /// Eat the next characters as a RegExp `DecimalEscape` production if possible.
+    /// Set `self.last_int_value` if it ate the next characters successfully.
     /// ```grammar
     /// DecimalEscape::
     ///      NonZeroDigit DecimalDigits(opt) [lookahead ∉ DecimalDigit]
@@ -1245,25 +1240,24 @@ impl EcmaRegexValidator {
         self.last_int_value = 0;
         if let Some(cp) = self.code_point_with_offset(0) {
             if cp.is_digit(10) {
-                self.last_int_value = 10 * self.last_int_value + cp.to_digit(10).unwrap() as usize;
+                self.last_int_value = 10 * self.last_int_value + cp.to_digit(10).unwrap() as i64;
                 self.advance();
-                /*do {
-                    self.last_int_value = 10 * self.last_int_value + cp.to_digit(10);
+                while let Some(cp) = self.code_point_with_offset(0) {
+                    if !cp.is_digit(10) {
+                        break;
+                    }
+                    self.last_int_value = 10 * self.last_int_value + cp.to_digit(10).unwrap() as i64;
                     self.advance();
-                } while (
-                    (cp = this.currentCodePoint) >= DigitZero &&
-                    cp <= DigitNine
-                )*/
+                }
                 return true;
             }
         }
         return false;
     }
 
-    /// Eat the next characters as a RegExp `UnicodePropertyValueExpression`
-    /// production if possible.
-    /// Set `this._lastKeyValue` and `this._lastValValue` if it ate the next
-    /// characters successfully.
+    /// Eat the next characters as a RegExp `UnicodePropertyValueExpression` production if possible.
+    /// Set `self.last_key_value` and `self.last_val_value` if it ate the next characters
+    /// successfully.
     /// ```grammar
     /// UnicodePropertyValueExpression::
     ///      UnicodePropertyName `=` UnicodePropertyValue
@@ -1308,9 +1302,8 @@ impl EcmaRegexValidator {
         Ok(false)
     }
 
-    /// Eat the next characters as a RegExp `UnicodePropertyName` production if
-    /// possible.
-    /// Set `this._lastStrValue` if it ate the next characters successfully.
+    /// Eat the next characters as a RegExp `UnicodePropertyName` production if possible.
+    /// Set `self.last_str_value` if it ate the next characters successfully.
     /// ```grammar
     /// UnicodePropertyName::
     ///      UnicodePropertyNameCharacters
@@ -1328,9 +1321,8 @@ impl EcmaRegexValidator {
         self.last_str_value != ""
     }
 
-    /// Eat the next characters as a RegExp `UnicodePropertyValue` production if
-    /// possible.
-    /// Set `this._lastStrValue` if it ate the next characters successfully.
+    /// Eat the next characters as a RegExp `UnicodePropertyValue` production if possible.
+    /// Set `self.last_str_value` if it ate the next characters successfully.
     /// ```grammar
     /// UnicodePropertyValue::
     ///      UnicodePropertyValueCharacters
@@ -1348,9 +1340,8 @@ impl EcmaRegexValidator {
         self.last_str_value != ""
     }
 
-    /// Eat the next characters as a RegExp `UnicodePropertyValue` production if
-    /// possible.
-    /// Set `this._lastStrValue` if it ate the next characters successfully.
+    /// Eat the next characters as a RegExp `UnicodePropertyValue` production if possible.
+    /// Set `self.last_str_value` if it ate the next characters successfully.
     /// ```grammar
     /// LoneUnicodePropertyNameOrValue::
     ///      UnicodePropertyValueCharacters
@@ -1361,7 +1352,7 @@ impl EcmaRegexValidator {
     }
 
     /// Eat the next characters as a `HexEscapeSequence` production if possible.
-    /// Set `this._lastIntValue` if it ate the next characters successfully.
+    /// Set `self.last_int_value` if it ate the next characters successfully.
     /// ```grammar
     /// HexEscapeSequence::
     ///      `x` HexDigit HexDigit
@@ -1406,7 +1397,7 @@ impl EcmaRegexValidator {
                     .code_point_with_offset(0)
                     .unwrap()
                     .to_digit(10)
-                    .unwrap() as usize;
+                    .unwrap() as i64;
             self.advance();
         }
 
@@ -1414,7 +1405,7 @@ impl EcmaRegexValidator {
     }
 
     /// Eat the next characters as a `HexDigits` production if possible.
-    /// Set `this._lastIntValue` if it ate the next characters successfully.
+    /// Set `self.last_int_value` if it ate the next characters successfully.
     /// ```grammar
     /// HexDigits::
     ///      HexDigit
@@ -1430,7 +1421,7 @@ impl EcmaRegexValidator {
             if !cp.is_digit(16) {
                 break;
             }
-            self.last_int_value = 16 * self.last_int_value + cp.to_digit(16).unwrap() as usize;
+            self.last_int_value = 16 * self.last_int_value + cp.to_digit(16).unwrap() as i64;
             self.advance();
         }
         return self.index() != start;
@@ -1471,7 +1462,7 @@ impl EcmaRegexValidator {
     }
 
     /// Eat the next characters as a `OctalDigit` production if possible.
-    /// Set `this._lastIntValue` if it ate the next characters successfully.
+    /// Set `self.last_int_value` if it ate the next characters successfully.
     /// ```grammar
     /// OctalDigit:: one of
     ///      0 1 2 3 4 5 6 7
@@ -1481,7 +1472,7 @@ impl EcmaRegexValidator {
         if let Some(cp) = self.code_point_with_offset(0) {
             if cp.is_digit(8) {
                 self.advance();
-                self.last_int_value = cp.to_digit(8).unwrap() as usize;
+                self.last_int_value = cp.to_digit(8).unwrap() as i64;
                 return true;
             }
         }
@@ -1489,15 +1480,14 @@ impl EcmaRegexValidator {
         return false;
     }
 
-    /// Eat the next characters as the given number of `HexDigit` productions if
-    /// possible.
+    /// Eat the next characters as the given number of `HexDigit` productions if possible.
     /// Set `self.last_int_value` if it ate the next characters successfully.
     /// ```grammar
     /// HexDigit:: one of
     ///      0 1 2 3 4 5 6 7 8 9 a b c d e f A B C D E F
     /// ```
     /// Returns `true` if it ate the next characters successfully.
-    fn eat_fixed_hex_digits(&mut self, length: usize) -> bool {
+    fn eat_fixed_hex_digits(&mut self, length: i64) -> bool {
         let start = self.index();
         self.last_int_value = 0;
         for _ in 0..length {
@@ -1507,7 +1497,7 @@ impl EcmaRegexValidator {
                 return false;
             }
             self.last_int_value =
-                16 * self.last_int_value + cp.unwrap().to_digit(16).unwrap() as usize;
+                16 * self.last_int_value + cp.unwrap().to_digit(16).unwrap() as i64;
             self.advance();
         }
         return true;
