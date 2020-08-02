@@ -8,6 +8,90 @@ extern crate regexpp_rs;
 use regexpp_rs::{EcmaRegexValidator, EcmaVersion};
 
 #[test]
+fn basic_invalid() {
+    // source: https://github.com/mysticatea/regexpp/blob/master/test/fixtures/parser/literal/basic-invalid.json
+    let mut validator = EcmaRegexValidator::new(EcmaVersion::ES5);
+    assert_ne!(validator.validate_pattern("(", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?=", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?=foo", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?!", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?!foo", false), Ok(()));
+    assert_ne!(validator.validate_pattern("a{2,1}", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(a{2,1}", false), Ok(()));
+    assert_ne!(validator.validate_pattern("a{2,1}?", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(*)", false), Ok(()));
+    assert_ne!(validator.validate_pattern("+", false), Ok(()));
+    assert_ne!(validator.validate_pattern("?", false), Ok(()));
+    assert_ne!(validator.validate_pattern(")", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[", false), Ok(()));
+    assert_ne!(validator.validate_pattern("^*", false), Ok(()));
+    assert_ne!(validator.validate_pattern("$*", false), Ok(()));
+    assert_ne!(validator.validate_pattern("${1,2}", false), Ok(()));
+    assert_ne!(validator.validate_pattern("${2,1}", false), Ok(()));
+    assert_ne!(validator.validate_pattern("\\2(a)(", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?a", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?a)", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?:", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?:a", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(:a", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[b-a]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[a-b--+]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\u0001-\\u0000]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\u{1}-\\u{2}]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\u{2}-\\u{1}]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\z-\\a]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[0-9--+]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\c-a]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[🌷-🌸]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[🌸-🌷]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\uD834\\uDF06-\\uD834\\uDF08a-z]", false), Ok(()));
+}
+
+#[test]
+fn basic_invalid_2015() {
+    // source: https://github.com/mysticatea/regexpp/blob/master/test/fixtures/parser/literal/basic-invalid-2015.json
+    let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2015);
+    assert_ne!(validator.validate_pattern("(", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?=", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?=foo", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?!", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?!foo", false), Ok(()));
+    assert_ne!(validator.validate_pattern("a{2,1}", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(a{2,1}", false), Ok(()));
+    assert_ne!(validator.validate_pattern("a{2,1}?", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(*)", false), Ok(()));
+    assert_ne!(validator.validate_pattern("+", false), Ok(()));
+    assert_ne!(validator.validate_pattern("?", false), Ok(()));
+    assert_ne!(validator.validate_pattern(")", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[", false), Ok(()));
+    assert_ne!(validator.validate_pattern("^*", false), Ok(()));
+    assert_ne!(validator.validate_pattern("$*", false), Ok(()));
+    assert_ne!(validator.validate_pattern("${1,2}", false), Ok(()));
+    assert_ne!(validator.validate_pattern("${2,1}", false), Ok(()));
+    assert_ne!(validator.validate_pattern("\\2(a)(", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?a", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?a)", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?:", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?:a", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(:a", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[b-a]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[a-b--+]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\u0001-\\u0000]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\u{1}-\\u{2}]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\u{2}-\\u{1}]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\z-\\a]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[0-9--+]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\c-a]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[🌷-🌸]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\u0000-🌸-\\u0000]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\u0000-\\ud83c\\udf38-\\u0000]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[🌸-🌷]", false), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\uD834\\uDF06-\\uD834\\uDF08a-z]", false), Ok(()));
+}
+
+#[test]
 fn basic_invalid_2015_unicode() {
     // source: https://github.com/mysticatea/regexpp/blob/master/test/fixtures/parser/literal/basic-invalid-2015-u.json
     let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2015);
@@ -125,6 +209,18 @@ fn basic_invalid_2015_unicode() {
 }
 
 #[test]
+fn lookbehind_assertion_invalid_2017() {
+    // source: https://github.com/mysticatea/regexpp/blob/master/test/fixtures/parser/literal/lookbehind-assertion-invalid-2017.json
+    let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2017);
+    assert_ne!(validator.validate_pattern("(?<a)", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<a)", true), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<=a)", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<=a)", true), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<!a)", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<!a)", true), Ok(()));
+}
+
+#[test]
 fn lookbehind_assertion_invalid_2018() {
     // source: https://github.com/mysticatea/regexpp/blob/master/test/fixtures/parser/literal/lookbehind-assertion-invalid-2018.json
     let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2018);
@@ -146,6 +242,20 @@ fn lookbehind_assertion_invalid_2018() {
     assert_ne!(validator.validate_pattern("(?<!a)*", true), Ok(()));
     assert_ne!(validator.validate_pattern("(?<!a){1}", false), Ok(()));
     assert_ne!(validator.validate_pattern("(?<!a){1}", true), Ok(()));
+}
+
+#[test]
+fn named_capturing_group_invalid_2017() {
+    // source: https://github.com/mysticatea/regexpp/blob/master/test/fixtures/parser/literal/named-capturing-group-invalid-2017.json
+    let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2017);
+    assert_ne!(validator.validate_pattern("\\k", true), Ok(()));
+    assert_ne!(validator.validate_pattern("\\k<a>", true), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<a>a)\\k<", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<a>a)\\k<", true), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<a>a)\\k<a", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<a>a)\\k<a", true), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<a>a)\\k<a>", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<a>a)\\k<a>", true), Ok(()));
 }
 
 #[test]
@@ -174,4 +284,42 @@ fn named_capturing_group_invalid_2018() {
     assert_ne!(validator.validate_pattern("(?<\\u0020>a)\\k<\\u0020>", true), Ok(()));
     assert_ne!(validator.validate_pattern("(?<\\u0061\\u0062\\u0063>a)\\k<abd>", true), Ok(()));
     assert_ne!(validator.validate_pattern("(?<11>a)\\k<11>", true), Ok(()));
+}
+
+#[test]
+fn unicode_group_names_invalid_2020() {
+    // source: https://github.com/mysticatea/regexpp/blob/master/test/fixtures/parser/literal/unicode-group-names-invalid.json
+    let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2020);
+    assert_ne!(validator.validate_pattern("(?<\\ud83d\\ude80>.)", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<\\ud83d\\ude80>.)", true), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<\\u{1f680}>.)", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<\\u{1f680}>.)", true), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<🚀>.)", false), Ok(()));
+    assert_ne!(validator.validate_pattern("(?<🚀>.)", true), Ok(()));
+}
+
+#[test]
+fn unicode_property_escape_invalid_2017() {
+    // source: https://github.com/mysticatea/regexpp/blob/master/test/fixtures/parser/literal/unicode-property-escape-invalid-2017.json
+    let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2017);
+    assert_ne!(validator.validate_pattern("\\p", true), Ok(()));
+    assert_ne!(validator.validate_pattern("\\p{", true), Ok(()));
+    assert_ne!(validator.validate_pattern("\\p{ASCII", true), Ok(()));
+    assert_ne!(validator.validate_pattern("\\p{ASCII}", true), Ok(()));
+}
+
+#[test]
+fn unicode_property_escape_invalid_2018() {
+    // source: https://github.com/mysticatea/regexpp/blob/master/test/fixtures/parser/literal/unicode-property-escape-invalid-2018.json
+    let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2018);
+    assert_ne!(validator.validate_pattern("\\p", true), Ok(()));
+    assert_ne!(validator.validate_pattern("\\p{", true), Ok(()));
+    assert_ne!(validator.validate_pattern("\\p{ASCII", true), Ok(()));
+    assert_ne!(validator.validate_pattern("\\p{General_Category}", true), Ok(()));
+    assert_ne!(validator.validate_pattern("\\p{General_Category=}", true), Ok(()));
+    assert_ne!(validator.validate_pattern("\\p{General_Category", true), Ok(()));
+    assert_ne!(validator.validate_pattern("\\p{General_Category=", true), Ok(()));
+    assert_ne!(validator.validate_pattern("\\p{General_Category=Letter", true), Ok(()));
+    assert_ne!(validator.validate_pattern("\\p{General_Category=Hiragana}", true), Ok(()));
+    assert_ne!(validator.validate_pattern("[\\p{Script=Hiragana}-\\p{Script=Katakana}]", true), Ok(()));
 }
