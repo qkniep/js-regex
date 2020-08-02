@@ -186,7 +186,5 @@ mod tests {
         assert_eq!(reader.at(0).unwrap() as u32, 1048771);
         reader.reset("􀃃ello", 0, 6, true);
         assert_eq!(reader.at(0).unwrap() as u32, 1048771);
-        //reader.reset("􀃃ello", 0, 6, true);
-        //assert_eq!(reader.at(1).unwrap() as u32, 56515);
     }
 }

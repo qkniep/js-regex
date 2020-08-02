@@ -8,7 +8,7 @@ extern crate regexpp_rs;
 use regexpp_rs::{EcmaRegexValidator, EcmaVersion};
 
 #[test]
-fn it_works() {
+fn basic_valid() {
     let mut validator = EcmaRegexValidator::new(EcmaVersion::ES2018);
     assert_eq!(validator.validate_pattern("foo", false), Ok(()));
     assert_eq!(validator.validate_pattern("foo|bar", false), Ok(()));
