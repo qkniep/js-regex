@@ -1,9 +1,9 @@
 # `js-regex`
 
-[![Build Status](https://img.shields.io/travis/qkniep/regexpp-rs?logo=travis)](https://travis-ci.org/qkniep/regexpp-rs)
-[![codecov](https://codecov.io/gh/qkniep/regexpp-rs/branch/master/graph/badge.svg)](https://codecov.io/gh/qkniep/regexpp-rs)
-![LoC](https://tokei.rs/b1/github/qkniep/regexpp-rs?category=code)
-[![License](https://img.shields.io/github/license/qkniep/regexpp-rs)](LICENSE)
+[![Build Status](https://img.shields.io/travis/qkniep/js-regex?logo=travis)](https://travis-ci.org/qkniep/js-regex)
+[![codecov](https://codecov.io/gh/qkniep/js-regex/branch/master/graph/badge.svg)](https://codecov.io/gh/qkniep/js-regex)
+![LoC](https://tokei.rs/b1/github/qkniep/js-regex?category=code)
+[![License](https://img.shields.io/github/license/qkniep/js-regex)](LICENSE)
 
 Rust port of [regexpp](https://github.com/mysticatea/regexpp) (ECMAScript regular expression parser).
 This crate is being developed mainly as an efficient validator of ECMAScript regular expressions for
