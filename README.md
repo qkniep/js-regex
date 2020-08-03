@@ -1,4 +1,4 @@
-# `js-regexp`
+# `js-regex`
 
 [![Build Status](https://img.shields.io/travis/qkniep/regexpp-rs?logo=travis)](https://travis-ci.org/qkniep/regexpp-rs)
 [![codecov](https://codecov.io/gh/qkniep/regexpp-rs/branch/master/graph/badge.svg)](https://codecov.io/gh/qkniep/regexpp-rs)
